@@ -1,5 +1,5 @@
 /*
-gatherhub.js is distributed under the permissive MIT License:
+confagent.js is distributed under the permissive MIT License:
 
 Copyright (c) 2015, Quark Li, quarkli@gmail.com
 All rights reserved.
@@ -94,7 +94,6 @@ var Gatherhub = Gatherhub || {};
                 Object.defineProperty(ca, 'removePeer', { value: removePeer });
                 Object.defineProperty(ca, 'request', { value: request });
                 Object.defineProperty(ca, 'response', { value: response });
-                Object.defineProperty(ca, 'close', { value: close });
                 Object.defineProperty(ca, 'mute', { value: mute });
                 Object.defineProperty(ca, 'cancel', { value: cancel });
                 Object.defineProperty(ca, 'exit', { value: exit });
@@ -148,7 +147,7 @@ var Gatherhub = Gatherhub || {};
 	            	return true;
             	}
             	else if (onerror) {
-                    	setTimeout(function() { onerror('ConfAgent Error (request): Conference Agent is not idle state'); }, 0);
+                    	setTimeout(function() { onerror('ConfAgent Error (request): Conference Agent is not in idle state'); }, 0);
                 }
 
                 // ConfAgent can only make request when its state is 'idle'
@@ -200,20 +199,6 @@ var Gatherhub = Gatherhub || {};
             	}
             }
 
-            // specifically close a peer's connection, this should only be called when a peer was disconnected unexpectedly
-            function close(p) {
-                // if pmedchans exits, end it
-                if (pmedchans[p]) { pmedchans[p].end(); }
-
-                // set pstate to 'left' and notify applicate in a fake response event
-                pstate[p] = 'left';
-                if (onconfresponse) {
-                    setTimeout(function() {
-                        onconfresponse({from: p, type: 'conf', data: {cmd: 'response', peers: peers, pstate: pstate}}); 
-                    }, 0);
-                }
-            }
-
             // mute microphone
             function mute() {
                 // set local muted flag
@@ -258,7 +243,6 @@ var Gatherhub = Gatherhub || {};
             // application should call ConfAgent.consumemsg() first before processing PeerCom messages
             // if message is what ConfAgent concerns, it will be consumed and return null, or return as is if irrelavant
             function consumemsg(msg) {
-                var pout = 0, pin = 0;
             	if (msg.type == 'conf') {
             		switch (msg.data.cmd) {
             			case 'offer':
@@ -318,12 +302,7 @@ var Gatherhub = Gatherhub || {};
 			                	}
 			                }
 
-            				// close conference if all joined peers have left
-                            peers.forEach(function(p) {
-                                if (pstate[p] == 'accepted' || pstate[p] == 'joined' || pstate[p] == 'host') { pin++; }
-                                if (pstate[p] == 'rejected' || pstate[p] == 'left') { pout++; }
-                            });
-                            if ((pout > 0 && pin == 0) || (pin == 1 && pstate[peers[0]] == 'joined')) { exit(); }
+                            _exitcheck();
             				break;
             			case 'cancel':
                             // if host canceled request, ConfAgent might have already accepted request and initiated media channel
@@ -338,7 +317,10 @@ var Gatherhub = Gatherhub || {};
 
             		return null;
             	}
-            	else { return msg; }
+            	else {
+                    if (msg.type == 'bye') { _close(msg.from); }
+                    return msg;
+                }
             }
 
             // To setup media channels need by ConfAgent, ConfAgent need to process PeerCom media request event
@@ -388,6 +370,31 @@ var Gatherhub = Gatherhub || {};
                     if (pc.peers[p]) { pc.send({cmd: 'response', peers: peers, pstate: pstate}, 'conf', p); }
                 });
                 _changeState(pstate[peers[0]]);
+            }
+
+            function _exitcheck() {
+                var pout = 0, pin = 0;
+                // close conference if all joined peers have left
+                peers.forEach(function(p) {
+                    if (pstate[p] == 'accepted' || pstate[p] == 'joined' || pstate[p] == 'host') { pin++; }
+                    if (pstate[p] == 'rejected' || pstate[p] == 'left') { pout++; }
+                });
+                if ((pout > 0 && pin == 0) || (pin == 1 && pstate[peers[0]] == 'joined')) { exit(); }
+            }
+
+            // specifically close a peer's connection, this should only be called when a peer was disconnected unexpectedly
+            function _close(p) {
+                // if pmedchans exits, end it
+                if (pmedchans[p]) { pmedchans[p].end(); }
+
+                // set pstate to 'left' and notify applicate in a fake response event
+                pstate[p] = 'left';
+                if (onconfresponse) {
+                    setTimeout(function() {
+                        onconfresponse({from: p, type: 'conf', data: {cmd: 'response', peers: peers, pstate: pstate}}); 
+                    }, 0);
+                }
+                _exitcheck();
             }
 
             // initiate defalut values

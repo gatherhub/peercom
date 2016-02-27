@@ -1,5 +1,5 @@
 /*
-gatherhub.js is distributed under the permissive MIT License:
+peercom-example.js is distributed under the permissive MIT License:
 
 Copyright (c) 2015, Quark Li, quarkli@gmail.com
 All rights reserved.
@@ -27,7 +27,7 @@ Author: quarkli@gmail.com
 'use strict'
 
 // declared variable in public space for the convenience of debugging
-var mpc, mca;
+var mpc, mca, msa;
 var reqpool = [];
 
 (function() {
@@ -56,22 +56,41 @@ var reqpool = [];
     // create PeerCom Object and configure event handlers
     var pc = mpc = new Gatherhub.PeerCom({peer: peer, hub: hub, servers: servers, iceservers: iceservers});
     var ca = mca = new Gatherhub.ConfAgent(pc);
+    var sa = msa = new Gatherhub.CastAgent(pc);
 
     // Check browser, currently only support Google Chrome
     var isChrome = !!window.chrome;
 
     if (!isChrome) { alert('Sorry! Your browser does not support HTML5. This application is now running in Google Chrome browser (PC/Mobile).'); }
 
+    sa.oncaststart = setPeerCasting;
+    sa.oncaststop = resetPeerPanel;
+    sa.onlocalstream = function(s) {
+        cid = getHostPanelId();
+        addLocalMedia(s);
+    };
+    sa.onremotestream = function(medchan) {
+        if (medchan.rstream) { addRemoteMedia(medchan.rstream); }
+        else { medchan.onrstreamready = addRemoteMedia; }
+    };
+    sa.onpeerjoin = function(p) {
+        showPeerPanel(p);
+        hidePeerButtons(p);
+    };
+    sa.onpeerleft = function(p) {
+        hidePeerPanel(p);
+    };
+
     ca.onconfrequest = function(req) {
-        if (cstate == 'idle' || cstate == 'confprep') {
+        if (cstate == 'idle' || cstate == 'confprep' || cstate == 'castprep') {
             var ctype = req.mdesc.video ? 'video' : 'audio';
 
             resetDefault();
 
             // change buttons to 'accept' and 'reject'
             hidePeerButtons(getHostPanelId());
-            addPeerButton(getHostPanelId(), btnaccept, acceptConf);
-            addPeerButton(getHostPanelId(), btnreject, rejectConf);
+            addPeerButton(getHostPanelId(), sbtn.accept, acceptConf);
+            addPeerButton(getHostPanelId(), sbtn.reject, rejectConf);
 
             // hide other peers
             hidePeerPanel();
@@ -114,13 +133,13 @@ var reqpool = [];
         ring.pause();
         ringback.pause();
 
-        recycleElement(btncancel);
-        addPeerButton(getHostPanelId(), btnmute, function() {
+        recycleElement(sbtn.cancel);
+        addPeerButton(getHostPanelId(), sbtn.mute, function() {
             ca.mute();
-            if (ca.muted) { btnmute.removeClass('btn-warning').addClass('btn-success').html('unmute'); }
-            else { btnmute.removeClass('btn-success').addClass('btn-warning').html('mute'); }
+            if (ca.muted) { sbtn.mute.removeClass('btn-warning').addClass('btn-success').html('unmute'); }
+            else { sbtn.mute.removeClass('btn-success').addClass('btn-warning').html('mute'); }
         });
-        addPeerButton(getHostPanelId(), btnend, endConf);
+        addPeerButton(getHostPanelId(), sbtn.end, endConf);
 
         cid = pc.id;
 
@@ -175,6 +194,7 @@ var reqpool = [];
             addPeer(pc, 1);
             resetHostPanel();
             ca.start();
+            sa.start();
         }
     };
     pc.onpeerchange = function (peers) {
@@ -190,7 +210,6 @@ var reqpool = [];
         keys.forEach(function(i) {
             // if the left peer is currently on a call, end the call
             if (cid == i) { endCall('end'); }      // if the left peer is current call party, end the call
-            if (cstate == 'conferencing') { ca.close(i); }
             $('#' + i).remove();
             delete _peers[i];
         });
@@ -212,7 +231,9 @@ var reqpool = [];
     };
     pc.onmessage = function (msg) {
         // Let ConfAgent to consume the message first and process messaages not consumed by ConfAgent
-        if (ca.consumemsg(msg)) {
+        msg = ca.consumemsg(msg);
+        if (msg) { msg = sa.consumemsg(msg); }
+        if (msg) {
             // log message in console, may add text messaging feature later
             console.log('from:', msg.from);
             console.log('type:', msg.type);
@@ -223,12 +244,15 @@ var reqpool = [];
     };
     pc.onmediarequest = function (req) {
         // Let ConfAgent to consume the media request first and process request not consumed by ConfAgent
-        if (ca.consumereq(req)) {
+        req = ca.consumereq(req);
+        if (req) { req = sa.consumereq(req); }
+        if (req) {
             // Notify UI to respond to remote requests / answers
             switch (req.type) {
                 case 'offer':
-                    if (cstate == 'idle') {
+                    if (cstate == 'idle' || cstate == 'confprep' || cstate == 'castprep') {
                         if (pc.medchans[req.id]) {
+                            resetDefault();
                             var ctype = req.mdesc.video ? 'video' : 'audio';
                             // when received remote offer, rstream is ready
                             // add onlstreamready handler which will be fired upon acceptCall()
@@ -242,8 +266,8 @@ var reqpool = [];
 
                             // change buttons to 'accept' and 'reject'
                             hidePeerButtons(cid);
-                            addPeerButton(cid, btnaccept, acceptCall);
-                            addPeerButton(cid, btnreject, function() { endCall('reject'); })
+                            addPeerButton(cid, sbtn.accept, acceptCall);
+                            addPeerButton(cid, sbtn.reject, function() { endCall('reject'); })
 
                             // hide other peers
                             hidePeerPanel();
@@ -253,6 +277,7 @@ var reqpool = [];
                             setPeerTitle(cid, getPeerTitle(cid) + ' (' + ctype + ' call)');
 
                             // disable conference button
+                            enablePeerButton(getHostPanelId(), '.btn-cast', false);
                             enablePeerButton(getHostPanelId(), '.btn-conf', false);
 
                             // play ring tone
@@ -266,9 +291,9 @@ var reqpool = [];
                     // stop ringback tone
                     ringback.pause();
                     // change buttons
-                    recycleElement(btncancel);
-                    addPeerButton(cid, btnmute, muteCall);
-                    addPeerButton(cid, btnend, function(){ endCall('end'); });
+                    recycleElement(sbtn.cancel);
+                    addPeerButton(cid, sbtn.mute, muteCall);
+                    addPeerButton(cid, sbtn.end, function(){ endCall('end'); });
 
                     // change state
                     cstate = 'busy';
@@ -298,12 +323,15 @@ var reqpool = [];
     var recycle = $('<div>');
 
     // shared buttons that will only have single appearance in the page
-    var btnaccept = $('<button>').addClass('btn btn-sm btn-success').html('accept');
-    var btnreject = $('<button>').addClass('btn btn-sm btn-danger').html('reject');
-    var btncancel = $('<button>').addClass('btn btn-sm btn-danger').html('cancel');
-    var btnend = $('<button>').addClass('btn btn-sm btn-danger').html('end');
-    var btnmute = $('<button>').addClass('btn btn-sm btn-warning').html('mute');
-    var allbtns = [btnaccept, btnreject, btncancel, btnend, btnmute];
+    var sbtn = {
+        accept: $('<button>').addClass('btn btn-sm btn-success').html('accept'),
+        reject: $('<button>').addClass('btn btn-sm btn-danger').html('reject'),
+        cancel: $('<button>').addClass('btn btn-sm btn-danger').html('cancel'),
+        video: $('<button>').addClass('btn btn-sm btn-warning btn-video').html('video'),
+        audio: $('<button>').addClass('btn btn-sm btn-primary btn-audio').html('audio'),
+        end: $('<button>').addClass('btn btn-sm btn-danger').html('end'),
+        mute: $('<button>').addClass('btn btn-sm btn-warning').html('mute')
+    };
 
     // video element siziing css configs
     var szfull = {width: w, height: h};
@@ -371,20 +399,19 @@ var reqpool = [];
         if (isHost) {
             $('<div class="panel panel-primary host-panel">').css(peerpanel).attr({id: peer.id}).appendTo('#pgroup').append(phead).append(pbody);
             if (pc.support.video || pc.support.audio) {
+                $('<button>').addClass('btn btn-sm btn-default btn-cast').html('broadcast').appendTo(bgroup).on('click', prepCast);
                 $('<button>').addClass('btn btn-sm btn-success btn-conf').html('conference').appendTo(bgroup).on('click', prepConf);
-                if (pc.support.video) {
-                    $('<button>').addClass('btn btn-sm btn-warning btn-video').html('video').appendTo(bgroup).on('click', makeConf);
-                }
-                if (pc.support.audio) {
-                    $('<button>').addClass('btn btn-sm btn-primary btn-audio').html('audio').appendTo(bgroup).on('click', makeConf);
-                }
             }
         }
         else {
             $('<div class="panel panel-success peer-panel">').css(peerpanel).attr({id: peer.id}).appendTo('#pgroup').append(phead).append(pbody);
+            $('<button>').addClass('btn btn-sm btn-default btn-watch').html('watch').attr('disabled', false).appendTo(bgroup).on('click', recvCast);
+            $('<button>').addClass('btn btn-sm btn-default btn-listen').html('listen').attr('disabled', false).appendTo(bgroup).on('click', recvCast);
             $('<button>').addClass('btn btn-sm btn-warning btn-video').html('video').attr('disabled', true).appendTo(bgroup).on('click', makeCall);
             $('<button>').addClass('btn btn-sm btn-primary btn-audio').html('audio').attr('disabled', true).appendTo(bgroup).on('click', makeCall);
             $('<input type="checkbox" class="peersel">').appendTo(bgroup).on('click', validateCheckbox).hide();
+
+            resetPeerPanel(peer.id);
 
             // change peer panel visibility by current call/conference state
             if (cstate == 'confprep') {
@@ -401,6 +428,69 @@ var reqpool = [];
         ding.play();
     }
 
+    function prepCast() {
+        cstate = 'castprep';
+        // change buttons
+        hidePeerPanel();
+        hidePeerButtons(getHostPanelId());
+
+        // append cancel button
+        addPeerButton(getHostPanelId(), sbtn.video, makeCast);
+        addPeerButton(getHostPanelId(), sbtn.audio, makeCast);
+        addPeerButton(getHostPanelId(), sbtn.cancel, cancelConf);
+        enablePeerButton(getHostPanelId(), '.btn-video', true);
+        enablePeerButton(getHostPanelId(), '.btn-audio', true);
+        cstate = 'castprep';
+    }
+
+    function makeCast() {
+        // make request to each selected peer
+        var ctype = $(this).html();
+        var mdesc = ctype == 'video' ? {audio: {dir: 'sendonly'}, video: {mandatory: videoresol, dir: 'sendonly'}} : {audio: {dir: 'sendonly'}};
+
+        cid = getHostPanelId();
+        sa.startcast(mdesc);
+
+        // change button to sbtn.end
+        recycleElement(sbtn.video);
+        recycleElement(sbtn.audio);
+        recycleElement(sbtn.cancel);
+        addPeerButton(getHostPanelId(), sbtn.end, endCast);
+        enablePeerButton(getHostPanelId(), '.btn-cast', false);
+        enablePeerButton(getHostPanelId(), '.btn-conf', false);
+
+        setPeerTitle(cid, getPeerTitle(cid) + ' (' + ctype + ' broadcasting...)');
+        cstate = 'casting';
+    }
+
+    function endCast() {
+        sa.stopcast();
+        recycleElement(sbtn.end);
+        resetDefault();
+        cstate = 'idle';
+    }
+
+    function recvCast() {
+        var p = getPeerPanelId($(this));
+        cid = p;
+        sa.recvcast(p);
+        hidePeerPanel();
+        showPeerPanel(p);
+        hidePeerButtons(p);
+        addPeerButton(p, sbtn.end, endRecv);
+        enablePeerButton(getHostPanelId(), '.btn-cast', false);
+        enablePeerButton(getHostPanelId(), '.btn-conf', false);
+        cstate = 'recvcast';
+    }
+
+    function endRecv() {
+        var p = getPeerPanelId($(this));
+        sa.endrecv();
+        recycleElement(sbtn.end);
+        resetDefault();
+        cstate = 'idle';
+    }
+
     function prepConf() {
         cstate = 'confprep';
 
@@ -408,11 +498,13 @@ var reqpool = [];
         hidePeerButtons(getHostPanelId());
         showPeerButton(getHostPanelId(), '.btn-video');
         showPeerButton(getHostPanelId(), '.btn-audio');
-        enablePeerButton(getHostPanelId(), '.btn-video', false);
-        enablePeerButton(getHostPanelId(), '.btn-audio', false);
 
         // append cancel button
-        addPeerButton(getHostPanelId(), btncancel, cancelConf);
+        addPeerButton(getHostPanelId(), sbtn.video, makeConf);
+        addPeerButton(getHostPanelId(), sbtn.audio, makeConf);
+        addPeerButton(getHostPanelId(), sbtn.cancel, cancelConf);
+        enablePeerButton(getHostPanelId(), '.btn-video', false);
+        enablePeerButton(getHostPanelId(), '.btn-audio', false);
 
         // change peer list buttons to checkbox for conference parties selection
         hidePeerButtons();
@@ -440,9 +532,9 @@ var reqpool = [];
         // ConfAgent.request returns true if request can be made or false if not
         else if (ca.request(mdesc)) {
             // change buttons to 'accept' and 'reject'
-            recycleElement(btncancel);
+            recycleElement(sbtn.cancel);
             hidePeerButtons(getHostPanelId());
-            addPeerButton(getHostPanelId(), btncancel, cancelConf);
+            addPeerButton(getHostPanelId(), sbtn.cancel, cancelConf);
 
             // hide other peers
             hidePeerPanel();
@@ -468,8 +560,8 @@ var reqpool = [];
     }
 
     function acceptConf() {
-        recycleElement(btnaccept);
-        recycleElement(btnreject);
+        recycleElement(sbtn.accept);
+        recycleElement(sbtn.reject);
         ca.response('accept');
         cstate = 'conferencing';
     }
@@ -534,6 +626,7 @@ var reqpool = [];
         req = {to: cid, mdesc: mdesc};
 
         // disable conference button
+        enablePeerButton(getHostPanelId(), '.btn-cast', false);
         enablePeerButton(getHostPanelId(), '.btn-conf', false);
 
         // hide rest peers but show only taget peer in the list
@@ -542,7 +635,7 @@ var reqpool = [];
 
         // append cancel button to peer panel
         hidePeerButtons(cid);
-        addPeerButton(cid, btncancel, function(){ endCall('cancel'); });
+        addPeerButton(cid, sbtn.cancel, function(){ endCall('cancel'); });
 
         // indicate call type
         setPeerTitle(cid, getPeerTitle(cid) + ' (' + $(this).html() + ' call)');
@@ -595,10 +688,10 @@ var reqpool = [];
             }
 
             // change answering buttons to in-call buttons
-            recycleElement(btnreject);
-            recycleElement(btnaccept);
-            addPeerButton(cid, btnmute, muteCall);
-            addPeerButton(cid, btnend, function(){ endCall('end'); });
+            recycleElement(sbtn.reject);
+            recycleElement(sbtn.accept);
+            addPeerButton(cid, sbtn.mute, muteCall);
+            addPeerButton(cid, sbtn.end, function(){ endCall('end'); });
 
             creq = req;         // set public variable of request
             reqpool.push(req);  // put request back to queue
@@ -615,8 +708,8 @@ var reqpool = [];
         reqpool.push(req);
 
         // update mute button context
-        if (btnmute.html() == 'mute') { btnmute.removeClass('btn-warning').addClass('btn-success').html('unmute'); }
-        else { btnmute.removeClass('btn-success').addClass('btn-warning').html('mute'); }
+        if (sbtn.mute.html() == 'mute') { sbtn.mute.removeClass('btn-warning').addClass('btn-success').html('unmute'); }
+        else { sbtn.mute.removeClass('btn-success').addClass('btn-warning').html('mute'); }
     }
 
     function endCall(reason) {
@@ -665,7 +758,7 @@ var reqpool = [];
         reqpool = [];
 
         // recycle buttons
-        allbtns.forEach(function(e) { recycleElement(e); });
+        Object.keys(sbtn).forEach(function(k) { recycleElement(sbtn[k]); });
 
         // show default buttons and hidden peers
         resetHostPanel();
@@ -906,6 +999,15 @@ var reqpool = [];
             btn.on('click', clickfunc);
         }
     }
+    function setPeerCasting(p) {
+        if (sa.pmdesc[p]) {
+            var type = sa.pmdesc[p].video ? 'video' : 'audio';
+            setPeerTitle(p, getPeerTitle(p) + ' (' + type + ' broadcasting...)');
+            hidePeerButtons(p);
+            if (type == 'video') { showPeerButton(p, '.btn-watch'); }
+            else { showPeerButton(p, '.btn-listen'); }
+        }
+    }   
     function enablePeerButton(peer, btn, onoff) { $('#' + peer).find(btn).attr('disabled', !onoff); }
     function setPeerTitle(peer, title) { $('#' + peer).find('.title').html(title); }
     function getPeerTitle(peer) { return $('#' + peer).find('.title').html(); }
@@ -921,6 +1023,7 @@ var reqpool = [];
             $('#' + peer).find('.peersel').hide();
             resetPeerTitle(peer);
             resetPeerCheckbox(peer);
+            setPeerCasting(peer);
         }
         else {
             $('.peer-panel').find('button').hide();
@@ -930,11 +1033,13 @@ var reqpool = [];
             $('.peer-panel').find('.peersel').hide();
             resetPeerTitle();
             resetPeerCheckbox();
+            $('.peer-panel').each(function(k, e) { setPeerCasting(e.id); });
         }
     }
     function resetHostPanel() {
         $('.host-panel').find('.pbody').hide();
         $('.host-panel').find('button').attr('disabled', true).hide();
+        $('.host-panel').find('.btn-cast').attr('disabled', false).show();
         $('.host-panel').find('.btn-conf').attr('disabled', false).show();
         $('.host-panel').find('.title').html($('.host-panel').find('.title').attr('name'));
     }
@@ -946,7 +1051,7 @@ var reqpool = [];
     // recycle shared elements
     function recycleElement(e) {
         if (e.prop('tagName').toLowerCase() == 'button') { e.off('click'); }
-        if (e == btnmute) { e.removeClass('btn-success').addClass('btn-warning').html('mute'); }
+        if (e == sbtn.mute) { e.removeClass('btn-success').addClass('btn-warning').html('mute'); }
         e.appendTo(recycle);
     }
 

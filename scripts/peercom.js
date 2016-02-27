@@ -1,5 +1,5 @@
 /*
-gatherhub.js is distributed under the permissive MIT License:
+peercom.js is distributed under the permissive MIT License:
 
 Copyright (c) 2015, Quark Li, quarkli@gmail.com
 All rights reserved.
@@ -75,10 +75,11 @@ var Gatherhub = Gatherhub || {};
 
             // Private variables
             var _wcc = null;
+            var _locklocalstream = false;
 
             // Properties declaration
             var id, peer, hub, servers, iceservers, peers, medchans, support, state;
-            var onerror, onpeerchange, onmessage, onmediarequest, onstatechange, onpeerstatechange;
+            var onerror, onpeerchange, onmessage, onmediarequest, onstatechange, onpeerstatechange, onlocalstream;
             // Properties / Event Callbacks/ Methods declaration
             (function() {
                 // tyep check: string
@@ -184,6 +185,13 @@ var Gatherhub = Gatherhub || {};
                         else { warn(hint.fcb, 'onpeerstatechange'); }
                     }
                 });
+                Object.defineProperty(pc, 'onlocalstream', {
+                    get: function() { return onlocalstream; },
+                    set: function(x) {
+                        if (typeof(x) == 'function') { onlocalstream = x; }
+                        else { warn(hint.fcb, 'onlocalstream'); }
+                    }
+                });
 
                 // Methods declaration, read-only
                 Object.defineProperty(pc, 'start', { value: start });
@@ -191,6 +199,8 @@ var Gatherhub = Gatherhub || {};
                 Object.defineProperty(pc, 'send', { value: send });
                 Object.defineProperty(pc, 'mediaRequest', { value: mediaRequest });
                 Object.defineProperty(pc, 'mediaResponse', { value: mediaResponse });
+                Object.defineProperty(pc, 'setLocalStream', { value: setLocalStream });
+                Object.defineProperty(pc, 'freeLocalStream', { value: freeLocalStream });
             })();
 
             // Methods implementation
@@ -234,6 +244,7 @@ var Gatherhub = Gatherhub || {};
                             break;
                         case 'bye':
                             if (peers[msg.from]) { _removePeer(msg.from); }
+                            if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                             break;
                         case 'sdp':
                             if (peers[msg.from] === undefined) { _addPeer(msg.from, msg.data.peer, msg.data.support); }
@@ -351,6 +362,24 @@ var Gatherhub = Gatherhub || {};
                 else { warn(hint.medchan, 'PeerCom.mediaResponse()'); }
             }
 
+            function setLocalStream(mdesc) {
+                getUserMedia(mdesc, function(s) {
+                    localstream = s;
+                    if (onlocalstream) { setTimeout(function() { onlocalstream(s); }, 0); }
+                }, logErr);
+                _locklocalstream = true;
+            }
+
+            function freeLocalStream() {
+                _locklocalstream = false;
+                if (!_locklocalstream && localstream && Object.keys(medchans).length == 0) {
+                    localstream.getTracks().forEach(
+                        function(e) { e.stop(); }
+                    );
+                    localstream = null;
+                }
+            }
+
             // Private functions
             function _addPeer(pid, pname, spt) {
                 if (!peers[pid]) {
@@ -407,7 +436,7 @@ var Gatherhub = Gatherhub || {};
                 if (wmc.state == 'closed') {
                     delete medchans[wmc.id];
                     wmc = null;
-                    if (localstream && Object.keys(medchans).length == 0) {
+                    if (!_locklocalstream && localstream && Object.keys(medchans).length == 0) {
                         localstream.getTracks().forEach(
                             function(e) { e.stop(); }
                         );

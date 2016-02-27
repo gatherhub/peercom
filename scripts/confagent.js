@@ -258,6 +258,7 @@ var Gatherhub = Gatherhub || {};
             // application should call ConfAgent.consumemsg() first before processing PeerCom messages
             // if message is what ConfAgent concerns, it will be consumed and return null, or return as is if irrelavant
             function consumemsg(msg) {
+                var pout = 0, pin = 0;
             	if (msg.type == 'conf') {
             		switch (msg.data.cmd) {
             			case 'offer':
@@ -317,10 +318,12 @@ var Gatherhub = Gatherhub || {};
 			                	}
 			                }
 
-            				// close conference if there is only host peer left in the room
-                            if (peers.length < 3 && 
-                                (msg.data.pstate[msg.from] == 'rejected' ||
-                                msg.data.pstate[msg.from] == 'left')) { exit(); }
+            				// close conference if all joined peers have left
+                            peers.forEach(function(p) {
+                                if (pstate[p] == 'accepted' || pstate[p] == 'joined' || pstate[p] == 'host') { pin++; }
+                                if (pstate[p] == 'rejected' || pstate[p] == 'left') { pout++; }
+                            });
+                            if ((pout > 0 && pin == 0) || (pin == 1 && pstate[peers[0]] == 'joined')) { exit(); }
             				break;
             			case 'cancel':
                             // if host canceled request, ConfAgent might have already accepted request and initiated media channel
@@ -384,6 +387,7 @@ var Gatherhub = Gatherhub || {};
                 peers.forEach(function(p) {
                     if (pc.peers[p]) { pc.send({cmd: 'response', peers: peers, pstate: pstate}, 'conf', p); }
                 });
+                _changeState(pstate[peers[0]]);
             }
 
             // initiate defalut values

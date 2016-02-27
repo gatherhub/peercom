@@ -345,7 +345,7 @@ var Gatherhub = Gatherhub || {};
 
             function mediaResponse(req, answer) {
                 if (medchans[req.id]) {
-                    if (answer == 'accept') { medchans[req.id].accept(req.mdesc); }
+                    if (answer == 'accept') { medchans[req.id].accept(); }
                     else { medchans[req.id].reject(); }
                 }
                 else { warn(hint.medchan, 'PeerCom.mediaResponse()'); }
@@ -474,13 +474,16 @@ var Gatherhub = Gatherhub || {};
             };
             _pc.onaddstream = function(e) {
                 rstream = e.stream;
+                if (rstream.getVideoTracks().length) {
+                    if (videodir == 'sendonly' || videodir == 'inactive') { rstream.getVideoTracks()[0].enabled = false; }
+                }
                 if (onrstreamready) { onrstreamready(rstream); }
             };
 
             // not used yet, just log the event for now
             _pc.onremovestream = function(e) { console.log(e); };
 
-            var id, to, from, mdesc, lsdp, rsdp, lconn, rconn, lstream, rstream, muted, type, state;
+            var id, to, from, mdesc, lsdp, rsdp, lconn, rconn, lstream, rstream, muted, type, audiodir, videodir, state;
             var onstatechange, onlstreamready, onrstreamready;
             (function() {
                 // read-only properties
@@ -496,6 +499,8 @@ var Gatherhub = Gatherhub || {};
                 Object.defineProperty(wmc, 'rstream', {get: function() { return rstream; }});
                 Object.defineProperty(wmc, 'muted', {get: function() { return muted; }});
                 Object.defineProperty(wmc, 'type', {get: function() { return type; }});
+                Object.defineProperty(wmc, 'audiodir', {get: function() { return audiodir; }});
+                Object.defineProperty(wmc, 'videodir', {get: function() { return videodir; }});
                 Object.defineProperty(wmc, 'state', {get: function() { return state; }});
 
                 // Callbacks declaration, type check: function
@@ -531,8 +536,7 @@ var Gatherhub = Gatherhub || {};
                 Object.defineProperty(wmc, 'mute', { value: mute });
             })();
 
-            function accept(desc) {
-                mdesc = desc;
+            function accept() {
                 rsdp = new RTCSessionDescription(req.sdp);
                 _pc.setRemoteDescription(rsdp);
                 _makereq(false);
@@ -595,7 +599,8 @@ var Gatherhub = Gatherhub || {};
 
             function mute() {
                 muted = !muted;
-                if (lstream) { lstream.getAudioTracks()[0].enabled = !muted; }
+                if (lstream && lstream.getAudioTracks().length) { lstream.getAudioTracks()[0].enabled = !muted; }
+                if (audiodir == 'recvonly' || audiodir == 'inactive') { lstream.getAudioTracks()[0].enabled = false; }
             }
 
             // Private functions
@@ -614,8 +619,13 @@ var Gatherhub = Gatherhub || {};
 
             function _setlstream(s, isOffer) {
                 localstream = lstream = s;
-                lstream.getAudioTracks()[0].enabled = !muted;
-                if (onlstreamready) { onlstreamready(lstream); }
+                if (lstream.getAudioTracks().length) {
+                    lstream.getAudioTracks()[0].enabled = !muted;
+                    if (audiodir == 'recvonly' || audiodir == 'inactive') { lstream.getAudioTracks()[0].enabled = false; }
+                }
+                if (lstream.getVideoTracks().length) {
+                    if (videodir == 'recvonly' || videodir == 'inactive') { lstream.getVideoTracks()[0].enabled = false; }
+                }
 
                 // according to pcai, addStream does not work for firefox when request for video
                 // need a workaround if firefox needs to be supported
@@ -629,10 +639,46 @@ var Gatherhub = Gatherhub || {};
                     _changeState('accepting');
                     _pc.createAnswer(_negotiation, logErr);
                 }
+
+                if (onlstreamready) { onlstreamready(lstream); }
             }
 
             function _negotiation(sdp) {
                 _res.conn = null;
+
+                // only set sdp direction on offer request, answer side will generate corresponding sdp
+                if (!rsdp) {
+                    var ssdp = sdp.sdp;
+                    var astart = ssdp.search('m=audio');
+                    var vstart = ssdp.search('m=video');
+                    // check if audio stream direction needs to be modified
+                    if (audiodir != 'sendrecv' && astart > -1) {
+                        if (vstart > astart) {
+                            ssdp = ssdp.split('m=video');
+                            ssdp[0] = ssdp[0].split('sendrecv').join(audiodir);
+                            ssdp = ssdp.join('m=video');
+                        }
+                        else {
+                            ssdp = ssdp.split('m=audio');
+                            ssdp[1] = ssdp[1].split('sendrecv').join(audiodir);
+                            ssdp = ssdp.join('m=audio');
+                        }
+                    }
+                    // check if video stream direction needs to be modified
+                    if (videodir != ' sendrecv' && vstart > -1) {
+                        if (vstart > astart) {
+                            ssdp = ssdp.split('m=video');
+                            ssdp[1] = ssdp[1].split('sendrecv').join(videodir);
+                            ssdp = ssdp.join('m=video');
+                        }
+                        else {
+                            ssdp = ssdp.split('m=audio');
+                            ssdp[0] = ssdp[0].split('sendrecv').join(videodir);
+                            ssdp = ssdp.join('m=audio');
+                        }
+                    }
+                    sdp.sdp = ssdp;
+                }
                 _pc.setLocalDescription(sdp);
 
                 lsdp = _res.sdp = sdp;
@@ -640,12 +686,6 @@ var Gatherhub = Gatherhub || {};
             }
 
             function _closechan() {
-                // if (lstream) {
-                //     lstream.getTracks().forEach(
-                //         function(e) { e.stop(); }
-                //     );
-                //     // lstream = null;
-                // }
                 if (rstream) {
                     rstream.getTracks().forEach(
                         function(e) { e.stop(); }
@@ -681,13 +721,32 @@ var Gatherhub = Gatherhub || {};
                 id = _res.id = req.id || (parseInt(req.to, 16) + getTs()).toString(16);
                 to = _res.to = req.to;
                 from = _res.from = req.from;
-                mdesc = _res.mdesc = req.mdesc || {};
-                rsdp = {}
-                lsdp = _res.sdp = {};
+                rsdp = null;
+                lsdp = _res.sdp = null;
                 rconn = [];
                 lconn = [];
                 muted = false;
-                type = mdesc.video ? 'video' : 'audio';
+
+                mdesc = {};
+                if (req.mdesc) {
+                    _res.mdesc = req.mdesc;
+                    // set the media description fore getUserMedia
+                    if (req.mdesc.audio) {
+                        mdesc.audio = {};
+                        audiodir = req.mdesc.audio.dir || 'sendrecv';
+                        if (req.mdesc.audio.mandatory) { mdesc.audio.mandatory = req.mdesc.audio.mandatory; }
+                        if (req.mdesc.audio.optional) { mdesc.audio.optional = req.mdesc.audio.optional; }
+                        mdesc.audio = Object.keys(mdesc.audio).length ? mdesc.audio : true;
+                    }
+                    if (req.mdesc.video) {
+                        mdesc.video = {}
+                        videodir = req.mdesc.video.dir || 'sendrecv';
+                        if (req.mdesc.video.mandatory) { mdesc.video.mandatory = req.mdesc.video.mandatory; }
+                        if (req.mdesc.video.optional) { mdesc.video.optional = req.mdesc.video.optional; }
+                        mdesc.video = Object.keys(mdesc.video).length ? mdesc.video : true;
+                    }
+                    type = mdesc.video ? 'video' : 'audio';
+                }
 
                 _changeState('initialized');
 
@@ -696,6 +755,10 @@ var Gatherhub = Gatherhub || {};
                     _res.to = req.from;
                     _res.from = req.to;
                     _res.type = 'answer';
+
+                    audiodir = audiodir == 'sendonly' ? 'recvonly' : audiodir == 'recvonly' ? 'sendonly' : audiodir;
+                    videodir = videodir == 'sendonly' ? 'recvonly' : videodir == 'recvonly' ? 'sendonly' : audiodir;
+
                     _changeState('preparing');
                 }
                 // This is an new request, initiate make request

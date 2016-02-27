@@ -523,6 +523,8 @@ var reqpool = [];
     function makeCall() {
         var req = {};
         var mdesc = $(this).html() == 'video' ? {audio: true, video: {mandatory: videoresol}} : {audio: true};
+        // var mdesc = $(this).html() == 'video' ? {audio: {dir: 'sendonly'}, video: {mandatory: videoresol, dir: 'recvonly'}} : {audio: {dir: 'sendonly'}};
+        // var mdesc = $(this).html() == 'video' ? {audio: {dir: 'recvonly'}, video: {mandatory: videoresol, dir: 'sendonly'}} : {audio: {dir: 'sendonly'}};
   
         // get target peer id from panel id
         cid = $(this).parents('.peer-panel').attr('id');
@@ -682,7 +684,7 @@ var reqpool = [];
     function addLocalMedia(s) {
         if (!lmediaadded) {
             var src = URL.createObjectURL(s);
-            if (s.getVideoTracks().length) {
+            if (s.getVideoTracks().length && s.getVideoTracks()[0].enabled) {
                 if (!vpad.is(':visible')){ appendPeerVideo(cid); }
 
                 $(vidLocal).show();
@@ -703,7 +705,7 @@ var reqpool = [];
     // configure/add remote audio/video element
     function addRemoteMedia(s) {
         var src = URL.createObjectURL(s);
-        if (s.getVideoTracks().length) {
+        if (s.getVideoTracks().length && s.getVideoTracks()[0].enabled) {
             if (!vpad.is(':visible')){ appendPeerVideo(cid); }
 
             rvideo++;

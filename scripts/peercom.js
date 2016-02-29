@@ -139,9 +139,13 @@ var Gatherhub = Gatherhub || {};
                 Object.defineProperty(pc, 'autoping', {
                     get: function() { return autoping; },
                     set: function(x) {
-                        if (x) { setInterval(function() {
+                        if (x) {
+                            pc.send('','ping');
+
+                            setInterval(function() {
                                 pc.send('','ping');
                                 Object.keys(peers).forEach(function(k) {
+                                    if (isNaN(peers[k].overdue)) { peers[k].overdue = 0; }
                                     peers[k].overdue++;
                                     if (peers[k].overdue > 3) { _removePeer(k); }
                                 });
@@ -293,8 +297,10 @@ var Gatherhub = Gatherhub || {};
                             }
                             break;
                         case 'pong':
-                            peers[msg.from].overdue = 0;
-                            peers[msg.from].rtdelay = msg.data.delay;
+                            if (peers[msg.from]) {
+                                peers[msg.from].overdue = 0;
+                                peers[msg.from].rtdelay = msg.data.delay;
+                            }
                         default:
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                             break;
@@ -427,8 +433,10 @@ var Gatherhub = Gatherhub || {};
                         }
                         else {
                             if (msg.type == 'pong') {
-                                peers[msg.from].overdue = 0;
-                                peers[msg.from].rtdelay = msg.data.delay;
+                                if (peers[msg.from]) {
+                                    peers[msg.from].overdue = 0;
+                                    peers[msg.from].rtdelay = msg.data.delay;
+                                }
                             }
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                         }
@@ -440,6 +448,7 @@ var Gatherhub = Gatherhub || {};
                         if (s == 'close') { _removePeer(pid); }
                     };
                     peers[pid] = p;
+                    if (pc.autoping) { pc.send('', 'ping', p); }
                     if (pc.onpeerchange) {
                         setTimeout(function() { pc.onpeerchange(peers); }, 0);
                     }

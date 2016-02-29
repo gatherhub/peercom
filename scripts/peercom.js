@@ -32,9 +32,10 @@ var Gatherhub = Gatherhub || {};
 
 (function() {
     // Browser Naming Converter
-    var RPC = window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
-    var RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription;
-    var RTCIceCandidate = window.RTCIceCandidate || window.mozRTCIceCandidate;
+    var RPC = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+    var RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+    var RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
+    var MediaStream = window.MediaStream || window.webkitMediaStream || window.mozMediaStream;
     var getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia).bind(navigator);
     var warn = (console.error).bind(console);
 
@@ -556,6 +557,15 @@ var Gatherhub = Gatherhub || {};
             var id, to, from, mdesc, lsdp, rsdp, lconn, rconn, lstream, rstream, muted, type, audiodir, videodir, state;
             var onstatechange, onlstreamready, onrstreamready;
             (function() {
+                // type check: MediaStream
+                Object.defineProperty(wmc, 'csrcstream', {
+                    get: function() { return csrcstream; },
+                    set: function(x) {
+                        if (x instanceof MediaStream) { csrcstream = x; }
+                        return csrcstream;
+                    }
+                });
+
                 // read-only properties
                 Object.defineProperty(wmc, 'id', {get: function() { return id; }});
                 Object.defineProperty(wmc, 'to', {get: function() { return to; }});
@@ -675,7 +685,10 @@ var Gatherhub = Gatherhub || {};
 
             // Private functions
             function _makereq(isOffer) {
-                if (localstream) {
+                if (csrcstream) {
+                    _setlstream(csrcstream, isOffer);
+                }
+                else if (localstream) {
                     _setlstream(localstream, isOffer);
                 }
                 else {
@@ -817,6 +830,8 @@ var Gatherhub = Gatherhub || {};
                     }
                     type = mdesc.video ? 'video' : 'audio';
                 }
+
+                if (req.csrcstream) { wmc.csrcstream = req.csrcstream; }
 
                 _changeState('initialized');
 

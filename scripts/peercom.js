@@ -76,9 +76,10 @@ var Gatherhub = Gatherhub || {};
             // Private variables
             var _wcc = null;
             var _locklocalstream = false;
+            var _ap;
 
             // Properties declaration
-            var id, peer, hub, servers, iceservers, peers, medchans, support, state;
+            var id, peer, hub, servers, iceservers, peers, medchans, support, state, autoping, pingwait;
             var onerror, onpeerchange, onmessage, onmediarequest, onstatechange, onpeerstatechange, onlocalstream;
             // Properties / Event Callbacks/ Methods declaration
             (function() {
@@ -132,6 +133,31 @@ var Gatherhub = Gatherhub || {};
                     set: function(x) {
                         if (x) { iceservers = x; }
                         return iceservers;
+                    }
+                });
+                // if autoping == true, set periodical task, or clear it when disabled
+                Object.defineProperty(pc, 'autoping', {
+                    get: function() { return autoping; },
+                    set: function(x) {
+                        if (x) { setInterval(function() {
+                                pc.send('','ping');
+                                Object.keys(peers).forEach(function(k) {
+                                    peers[k].overdue++;
+                                    if (peers[k].overdue > 3) { _removePeer(k); }
+                                });
+                            }
+                        , pingwait);}
+                        else { clearInterval(_ap); }
+                        autoping = x;
+                        return autoping;
+                    }
+                });
+                // type check: numeric
+                Object.defineProperty(pc, 'pingwait', {
+                    get: function() { return pingwait; },
+                    set: function(x) {
+                        if (!isNaN(x)) { pingwait = 1 * x; }
+                        return pingwait;
                     }
                 });
 
@@ -220,6 +246,8 @@ var Gatherhub = Gatherhub || {};
                         s.getTracks().forEach(function(e) { e.stop(); });
                     }, logErr);
 
+                pc.pingwait = 30000;
+                pc.autoping = true;
                 _changeState('starting');
 
                 // Create WCC Object and Initiate Registration Event
@@ -265,7 +293,8 @@ var Gatherhub = Gatherhub || {};
                             }
                             break;
                         case 'pong':
-                            peers[msg.from].td = msg.data.delay;
+                            peers[msg.from].overdue = 0;
+                            peers[msg.from].rtdelay = msg.data.delay;
                         default:
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                             break;
@@ -397,7 +426,10 @@ var Gatherhub = Gatherhub || {};
                             }
                         }
                         else {
-                            if (msg.type == 'pong') { peers[msg.from].td = msg.data.delay; }
+                            if (msg.type == 'pong') {
+                                peers[msg.from].overdue = 0;
+                                peers[msg.from].rtdelay = msg.data.delay;
+                            }
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                         }
                     };

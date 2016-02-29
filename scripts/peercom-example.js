@@ -233,7 +233,7 @@ var reqpool = [];
         // Let ConfAgent to consume the message first and process messaages not consumed by ConfAgent
         msg = ca.consumemsg(msg);
         if (msg) { msg = sa.consumemsg(msg); }
-        if (msg) {
+        if (msg && msg.type != 'pong') {
             // log message in console, may add text messaging feature later
             console.log('from:', msg.from);
             console.log('type:', msg.type);

@@ -227,7 +227,6 @@ var Gatherhub = Gatherhub || {};
             function consumemsg(msg) {
                 var pout = 0, pin = 0;
             	if (msg.type == 'cast') {
-                    console.log(msg.data.cmd)
             		switch (msg.data.cmd) {
             			case 'start':
                             castpeers.push(msg.from);

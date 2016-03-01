@@ -198,7 +198,6 @@ var Gatherhub = Gatherhub || {};
             // stop receiving broadcast
             function endrecv() {
             	if (state == 'recvcast') {
-                    _removecast(_castpeer);
                     _casthost = null;
                     _castpeer = null;
                 }

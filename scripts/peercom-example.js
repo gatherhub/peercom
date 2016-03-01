@@ -64,7 +64,10 @@ var reqpool = [];
     if (!isChrome) { alert('Sorry! Your browser does not support HTML5. This application is now running in Google Chrome browser (PC/Mobile).'); }
 
     sa.oncaststart = setPeerCasting;
-    sa.oncaststop = resetPeerPanel;
+    sa.oncaststop = function(p) {
+        if (cstate == 'recvcast') { resetDefault(); }
+        else { resetPeerPanel(p); }
+    };
     sa.onlocalstream = function(s) {
         cid = getHostPanelId();
         addLocalMedia(s);

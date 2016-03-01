@@ -46,7 +46,8 @@ var Gatherhub = Gatherhub || {};
         	var ca = this;
             var mdesc, castpeers, pmdesc, pmedchans, lstream, state;
             var oncaststart, oncaststop, onpeerjoin, onpeerleft, onlocalstream, onremotestream, onstatechange;
-            var _peer;    // current broadcasting peer
+            var _casthost;    // current broadcasting host
+            var _castpeer;    // actual broadcasting peer, maybe the broadcasting hosr or relay peer
 
             // Properties / Event Callbacks/ Methods declaration
             (function() {
@@ -126,7 +127,8 @@ var Gatherhub = Gatherhub || {};
                 pmdesc = {};
                 pmedchans = {};
                 state = 'idle';
-                _peer = null;
+                _casthost = null;
+                _castpeer = null;
 
                 pc.send({cmd: 'query', mdesc: mdesc}, 'cast');
             }
@@ -184,25 +186,8 @@ var Gatherhub = Gatherhub || {};
             // receiving broadcst from a peer
             function recvcast(peer) {
             	if (state == 'idle' && pmdesc[peer]) {
-                    _peer = peer;
-                    mdesc = pmdesc[peer];
-                    if (mdesc.audio) { mdesc.audio.dir = 'recvonly'; }
-                    if (mdesc.video) { mdesc.video.dir = 'recvonly'; }
-	            	_changeState('requesting');
-
-                    // make mediarequest to peer
-                    var id = pc.mediaRequest({to: peer, mdesc: mdesc});
-                    if (id) {
-                        pmedchans[peer] = pc.medchans[id];
-                        // notify application a new media channel is created
-                        if (onremotestream) {
-                            setTimeout(function() { onremotestream(pmedchans[peer]); }, 0);
-                        }
-
-                        _changeState('recvcast');
-                        // return true for success
-                        return true;
-                    }
+                    _casthost = peer;
+                    pc.send({cmd: 'audlist'}, 'cast', _casthost);
             	}
 
                 _changeState('idle');
@@ -212,12 +197,12 @@ var Gatherhub = Gatherhub || {};
 
             // stop receiving broadcast
             function endrecv() {
-            	if (state == 'recvcast' && pmedchans[_peer]) {
-                    pmedchans[_peer].end();
-                    pmedchans[_peer] = null;
-                    delete pmedchans[_peer];
+            	if (state == 'recvcast' && pmedchans[_castpeer]) {
+                    pmedchans[_castpeer].end();
+                    pmedchans[_castpeer] = null;
+                    delete pmedchans[_castpeer];
                 }
-                pc.send({cmd: 'end', mdesc: mdesc}, 'cast', _peer);
+                pc.send({cmd: 'end', mdesc: mdesc}, 'cast', _casthost);
                 _changeState('idle');
             }
 
@@ -234,12 +219,12 @@ var Gatherhub = Gatherhub || {};
                             if (oncaststart) { setTimeout(function() { oncaststart(msg.from); }, 0); }
                             break;
             			case 'stop':
-                            if (state == 'recvcast' && _peer == msg.from && pmedchans[msg.from]) { endrecv(); }
+                            if (state == 'recvcast' && _casthost == msg.from && pmedchans[msg.from]) { endrecv(); }
                             if (castpeers.indexOf(msg.from) > -1) {
                                 castpeers.splice(castpeers.indexOf(msg.from),1);
                                 if (oncaststop) { setTimeout(function() { oncaststop(msg.from); }, 0); }
                             }
-                            if (pmdesc[msg.from]) { delete pmdesc[msg.from]; }
+                            if (pmdesc[_castpeer]) { endrecv(); }
             				break;
                         case 'end':
                             if (pmedchans[msg.from]) {
@@ -247,7 +232,26 @@ var Gatherhub = Gatherhub || {};
                                 pmedchans[msg.from] = null;
                                 delete pmedchans[msg.from];
                             }
-                            if (onpeerleft) { setTimeout(function() { onpeerleft(msg.from); }, 0); }
+                            if (state == 'casting' && onpeerleft) { setTimeout(function() { onpeerleft(msg.from); }, 0); }
+                            break;
+                        case 'audlist':
+                            if (msg.data.list) {
+                                _castpeer = _casthost;
+                                // broadcast relay implementation, comment it before it works
+                                // msg.data.list.forEach(function(k) {
+                                //     _castpeer =k;
+                                //     // if (pc.peers[k].rtdelay < pc.peers[_castpeer].rtdelay) { _castpeer = k; }
+                                // });
+                                // if (_castpeer != _casthost) {
+                                //     console.log('switch host')
+                                // }
+                                _recvfrom(_castpeer);
+                            }
+                            else {
+                                var alist = [];
+                                Object.keys(pmedchans).forEach(function(k) { alist.push(k); });
+                                pc.send({cmd: 'audlist', list: alist}, 'cast', msg.from);
+                            }
                             break;
                         case 'query':
                             if (state == 'casting') { pc.send({cmd: 'start', mdesc: mdesc}, 'cast', msg.from); }
@@ -265,7 +269,7 @@ var Gatherhub = Gatherhub || {};
                             pmedchans[msg.from] = null;
                             delete pmedchans[msg.from];
                         }
-                        if (onpeerleft) { setTimeout(function() { onpeerleft(msg.from); }, 0); }
+                        if (state == 'casting' && onpeerleft) { setTimeout(function() { onpeerleft(msg.from); }, 0); }
                     }
                     return msg;
                 }
@@ -280,15 +284,38 @@ var Gatherhub = Gatherhub || {};
                     // we only interested in answering (say 'yes') to an new offer reuqest (pmedchans[x] has not been created)
             		if (req.type == 'offer' && !pmedchans[req.from]) {
 	        			pmedchans[req.from] = pc.medchans[req.id];
+                        if (state == 'recvcast' && pmedchans[_castpeer]) {
+                            pc.medchans[req.id].csrcstream = pmedchans[_castpeer].rstream;
+                        }
                        // Auto-accept offer
 	        			pc.mediaResponse(req, 'accept');
-                        if (onpeerjoin) { setTimeout(function() { onpeerjoin(req.from); }, 0); }
+                        if (state == 'casting' && onpeerjoin) { setTimeout(function() { onpeerjoin(req.from); }, 0); }
             		}
             		return null;
             	}
             	else { return req; }
             }
 
+            function _recvfrom(peer) {
+                mdesc = pmdesc[_casthost];
+                if (mdesc.audio) { mdesc.audio.dir = 'recvonly'; }
+                if (mdesc.video) { mdesc.video.dir = 'recvonly'; }
+                _changeState('requesting');
+
+                // make mediarequest to peer
+                var id = pc.mediaRequest({to: peer, mdesc: mdesc});
+                if (id) {
+                    pmedchans[peer] = pc.medchans[id];
+                    // notify application a new media channel is created
+                    if (onremotestream) {
+                        setTimeout(function() { onremotestream(pmedchans[peer]); }, 0);
+                    }
+
+                    _changeState('recvcast');
+                    // return true for success
+                    return true;
+                }
+            }
             function _changeState(ste) {
                 state = ste;
                 if (onstatechange) {

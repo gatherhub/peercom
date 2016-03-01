@@ -302,6 +302,9 @@ var Gatherhub = Gatherhub || {};
                                 peers[msg.from].overdue = 0;
                                 peers[msg.from].rtdelay = msg.data.delay;
                             }
+                            else {
+                                _addPeer(msg.from, msg.data.peer, msg.data.support);
+                            }
                         default:
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                             break;
@@ -438,6 +441,9 @@ var Gatherhub = Gatherhub || {};
                                     peers[msg.from].overdue = 0;
                                     peers[msg.from].rtdelay = msg.data.delay;
                                 }
+                                else {
+                                    _addPeer(msg.from, msg.data.peer, msg.data.support);
+                                }
                             }
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                         }
@@ -539,9 +545,10 @@ var Gatherhub = Gatherhub || {};
                     _res.conn = e.candidate;
                     _dispatch();
                 }
+                if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) { _changeState('open'); }
             };
             _pc.oniceconnectionstatechange =_pc.onsignalingstatechange = function(e) {
-                if (_pc && _pc.iceConnectionState == 'connected') { _changeState('open'); }
+                if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) { _changeState('open'); }
             };
             _pc.onaddstream = function(e) {
                 rstream = e.stream;
@@ -554,14 +561,15 @@ var Gatherhub = Gatherhub || {};
             // not used yet, just log the event for now
             _pc.onremovestream = function(e) { console.log(e); };
 
-            var id, to, from, mdesc, lsdp, rsdp, lconn, rconn, lstream, rstream, muted, type, audiodir, videodir, state;
+            var id, to, from, mdesc, lsdp, rsdp, lconn, rconn, lstream, rstream, csrcstream;
+            var muted, type, audiodir, videodir, state;
             var onstatechange, onlstreamready, onrstreamready;
             (function() {
                 // type check: MediaStream
                 Object.defineProperty(wmc, 'csrcstream', {
                     get: function() { return csrcstream; },
                     set: function(x) {
-                        if (x instanceof MediaStream) { csrcstream = x; }
+                        if (x instanceof MediaStream || x == null) { csrcstream = x; }
                         return csrcstream;
                     }
                 });
@@ -685,10 +693,7 @@ var Gatherhub = Gatherhub || {};
 
             // Private functions
             function _makereq(isOffer) {
-                if (csrcstream) {
-                    _setlstream(csrcstream, isOffer);
-                }
-                else if (localstream) {
+                if (localstream) {
                     _setlstream(localstream, isOffer);
                 }
                 else {
@@ -702,6 +707,7 @@ var Gatherhub = Gatherhub || {};
 
             function _setlstream(s, isOffer) {
                 localstream = lstream = s;
+
                 if (lstream.getAudioTracks().length) {
                     lstream.getAudioTracks()[0].enabled = !muted;
                     if (audiodir == 'recvonly' || audiodir == 'inactive') { lstream.getAudioTracks()[0].enabled = false; }
@@ -709,6 +715,9 @@ var Gatherhub = Gatherhub || {};
                 if (lstream.getVideoTracks().length) {
                     if (videodir == 'recvonly' || videodir == 'inactive') { lstream.getVideoTracks()[0].enabled = false; }
                 }
+
+                // replace lstream with customized source stream if presented
+                if (csrcstream) { lstream = csrcstream; }
 
                 // according to pcai, addStream does not work for firefox when request for video
                 // need a workaround if firefox needs to be supported
@@ -809,6 +818,7 @@ var Gatherhub = Gatherhub || {};
                 rconn = [];
                 lconn = [];
                 muted = false;
+                csrcstream = null;
 
                 mdesc = {};
                 if (req.mdesc) {
@@ -830,8 +840,6 @@ var Gatherhub = Gatherhub || {};
                     }
                     type = mdesc.video ? 'video' : 'audio';
                 }
-
-                if (req.csrcstream) { wmc.csrcstream = req.csrcstream; }
 
                 _changeState('initialized');
 

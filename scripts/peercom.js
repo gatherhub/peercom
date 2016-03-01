@@ -304,6 +304,7 @@ var Gatherhub = Gatherhub || {};
                             }
                             else {
                                 _addPeer(msg.from, msg.data.peer, msg.data.support);
+                                peers[msg.from].sigchan.open();
                             }
                         default:
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
@@ -443,6 +444,7 @@ var Gatherhub = Gatherhub || {};
                                 }
                                 else {
                                     _addPeer(msg.from, msg.data.peer, msg.data.support);
+                                    peers[msg.from].sigchan.open();
                                 }
                             }
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }

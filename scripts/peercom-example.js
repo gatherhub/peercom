@@ -516,7 +516,7 @@ var reqpool = [];
 
         for (var k in pc.peers) {
             // hide peers which does not support both audio and video call
-            if (!pc.peers[k].support.video && !pc.peers[k].audio) { hidePeerPanel(k); }
+            if ((!pc.peers[k].support.video && !pc.peers[k].audio) || sa.pmdesc[k]) { hidePeerPanel(k); }
         }
      }
 

@@ -197,10 +197,10 @@ var Gatherhub = Gatherhub || {};
 
             // stop receiving broadcast
             function endrecv() {
-            	if (state == 'recvcast' && pmedchans[_castpeer]) {
-                    pmedchans[_castpeer].end();
-                    pmedchans[_castpeer] = null;
-                    delete pmedchans[_castpeer];
+            	if (state == 'recvcast') {
+                    _removecast(_castpeer);
+                    _casthost = null;
+                    _castpeer = null;
                 }
                 pc.send({cmd: 'end', mdesc: mdesc}, 'cast', _casthost);
                 _changeState('idle');
@@ -220,11 +220,8 @@ var Gatherhub = Gatherhub || {};
                             break;
             			case 'stop':
                             if (state == 'recvcast' && _casthost == msg.from && pmedchans[msg.from]) { endrecv(); }
-                            if (castpeers.indexOf(msg.from) > -1) {
-                                castpeers.splice(castpeers.indexOf(msg.from),1);
-                                if (oncaststop) { setTimeout(function() { oncaststop(msg.from); }, 0); }
-                            }
-                            if (pmdesc[_castpeer]) { endrecv(); }
+                            if (castpeers.indexOf(msg.from) > -1) { _removecast(msg.from); }
+                            if (oncaststop) { setTimeout(function() { oncaststop(msg.from); }, 0); }
             				break;
                         case 'end':
                             if (pmedchans[msg.from]) {
@@ -282,7 +279,7 @@ var Gatherhub = Gatherhub || {};
             	// if req has matched castid and exists in peers.medchan then process it, or return it to application
             	if (req.mdesc.castid && req.mdesc.castid == mdesc.castid && pc.medchans[req.id]) {
                     // we only interested in answering (say 'yes') to an new offer reuqest (pmedchans[x] has not been created)
-            		if (req.type == 'offer' && !pmedchans[req.from]) {
+            		if (state == 'casting' && req.type == 'offer' && !pmedchans[req.from]) {
 	        			pmedchans[req.from] = pc.medchans[req.id];
                         if (state == 'recvcast' && pmedchans[_castpeer]) {
                             pc.medchans[req.id].csrcstream = pmedchans[_castpeer].rstream;
@@ -316,6 +313,22 @@ var Gatherhub = Gatherhub || {};
                     return true;
                 }
             }
+
+            function _removecast(peer) {
+                if (pmedchans[peer]) {
+                    pmedchans[peer].end();
+                    pmedchans[peer] = null;
+                    delete pmedchans[peer];
+                }
+                if (pmdesc[peer]) {
+                    pmdesc[peer] = null;
+                    delete pmdesc[peer];
+                }
+                if (castpeers.indexOf(peer) > -1) {
+                    castpeers.splice(castpeers.indexOf(peer),1);
+                }
+            }
+
             function _changeState(ste) {
                 state = ste;
                 if (onstatechange) {

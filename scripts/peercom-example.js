@@ -233,7 +233,7 @@ var reqpool = [];
         // Let ConfAgent to consume the message first and process messaages not consumed by ConfAgent
         msg = ca.consumemsg(msg);
         if (msg) { msg = sa.consumemsg(msg); }
-        if (msg && msg.type != 'pong') {
+        if (msg && msg.type != 'pong' && msg.type != 'bye') {
             // log message in console, may add text messaging feature later
             console.log('from:', msg.from);
             console.log('type:', msg.type);
@@ -962,6 +962,10 @@ var reqpool = [];
         ring.pause();
         ringback.play();
         ringback.pause();
+        au.forEach(function(e) {
+            e.play();
+            e.paulse
+        });
 
         pc.start();
     }

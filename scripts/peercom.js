@@ -148,7 +148,7 @@ var Gatherhub = Gatherhub || {};
                                 Object.keys(peers).forEach(function(k) {
                                     if (isNaN(peers[k].overdue)) { peers[k].overdue = 0; }
                                     peers[k].overdue++;
-                                    if (peers[k].overdue > 3) { _removePeer(k); }
+                                    if (peers[k].overdue > 3 || peers[k].sigchan.state == 'closed') { _removePeer(k); }
                                 });
                             }
                         , pingwait);}

@@ -103,27 +103,37 @@ Media request provides the requirements of media channel. For a new request, use
 
 **id**
 
-String, read-only -
+String, read-only - 'id' is given by MSR (Message Switch Router) when PeerCom connected to one. It is used as the unique communication identy of PeerCom.
 
 **peer**
 
-String, read-write -
+String, read-write - 'peer' is the display name of the user. If user changes 'peer' value after PeerCom started, PeerCom will auto-restart to update the change to other peers.
 
 **hub**
 
-String, read-write -
+String, read-write - 'hub' is the identiification of a "room" PeerCom intended to join. 'hub' can be any String, but only PeerComs configured with the same 'hub' would be able to communicate to each others. If user changes 'hub' value after PeerCom started, PeerCom will auto-restart to join the updated 'hub'.
 
 **servers**
 
-Array[String], read-write -
+Array[String], read-write - Address of MSR in the formate of 'wss://<server>:<port>' in an Array. If more than one is provided, PeerCom will try to connect the next MSR in round-robin manner in connection failure. Insecure WebSocket (ws://) is also supported. However, there is strict requirement in browser that only allows web pages and scripts to open media devices from a secure channel. Hence, it is recommeded to use secure WebSocket to get full features of PeerCom available.
 
 **iceservers**
 
-Array[Object/JSON], read-write -
+Array[Object/JSON], read-write - Address of Ice servers, same sa defined in WebRTC. It is for WebRTC PeerConnection object initiation. A null value can be provided when testing peers are in the same LAN, but active Ice servers are needed if PeeCom is running over Internet.
 
 **peers**
 
-Object/JSON, read-only -
+Object/JSON, read-only - 'peers' is self-managed by PeerCom and holds the 'peer' objects of connected peers. 
+
+```javascript
+  peer = {
+    peer: "peer_name", 
+    sigchan: WPC,                   // WebRTC PeerConnection of Data Channel for peer-to-peer direct data/message communication
+    support: {audio: 1, video: 1},  // audio/video capability
+    overdue: 0,                     // times of missed response of a peer, updated only when 'autopin' sets to enable
+    rtdelay: 6                      // round-trip delay, auto-logged in 'ping' response
+  }
+```
 
 **medchans**
 

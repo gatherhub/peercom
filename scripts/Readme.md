@@ -1,12 +1,12 @@
 ## Overview
 
-There are four core Javascripts files for PeerCom:
-* peercom.js - Core implementation of PeerCom to provide all-in-one (data/audio/video) WebRTC peer functions with wrapped up signaling and call setup procedures and simple APIs.
-* confagent.js - Implementation of audio/video conferencing feature based on PeerCom.
-* castagent.js - Implementation of audio/video broadcassting feature based on PeerCom.
-* peercom-example.js - Implementation of integration of UI and PeerCom libraries.
+There are four core files for PeerCom:
+* peercom.js - Core implementation of PeerCom to provide all-in-one (data/audio/video) WebRTC peer functions with wrapped up signaling and media channel setup procedures in simple APIs.
+* confagent.js - Implementation of audio/video conferencing features based on PeerCom.
+* castagent.js - Implementation of audio/video broadcassting features based on PeerCom.
+* peercom-example.js - Demostration of integration of UI and PeerCom libraries.
 
-NOTE: To avoid naming conflicts, all object modules are declared under Gatherhub naming space. For examole. 
+NOTE: To avoid naming conflicts, all object modules are declared under Gatherhub naming space. For example. 
 
 ```javascript
 var pc = new Gatherhub.PeerCom(config);
@@ -16,9 +16,16 @@ var sa = new Gatherhub.CastAgent(pc);
 
 ## peercom.js
 
+peercom.js is the very core module of PeerCom. It consists three internal object modules which does not interact with application directly but do the real jobs below the surface. For developers who simply wants to leverage the capabilities of PeerCom, they do not need any further knowledge to the internal design of PeerCom. To those who may considering alter the design, here's a brief to these modules,
+
+* WCC - WebSocket Communication Channel. WCC plays the role as the basic signaling channel object. WCC is designed to provide the very basic functionalities to get connected and exchange pre-deifined or customized data with other PeerCom agents. A WebSocket server to incorporate with WCC named [Message Switch Router] (https://github.com/gatherhub/msgsrouter) written in Ruby is also provided in open source. There is only one WCC instance for each PeerCom agent.
+* WPC - WebRTC PeerConnection Channel. With the help from WCC, WPC sets up a meshed peer-to-peer data channels among connected PeerCom agents if possible and once the data channel is opened, WPC replace WCC as the major communication channel between peers. When WPC setup is not possible, peers can still send/receive message through WCC. PeerCom will check the availability automatically and selet the right one. There is one WPC for each connected peers.
+* WMC - WebRTC Media Channel. WMC is dynamically created and destroyed when a media transmision is needed or closed. There could be N WMC objects depending on the use cases. WMC handles all media creation, negotiation, and manipulation internally. Developer only needs to provide the correct configuration without geting involved to the complex procedures.
+
 ## confagent.js
 
 ## castagent.js
+
 CastAgent provides the funcationality of playing the role as a broadcasting host or audience. CastAgent is implemented with its own state and signalling process and leverage PeerCom to exchange signalling information and media channel set up.
 
 Usage example:

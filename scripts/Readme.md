@@ -19,8 +19,8 @@ var sa = new Gatherhub.CastAgent(pc);
 peercom.js is the very core module of PeerCom. It consists three internal object modules which does not interact with application directly but do the real jobs below the surface. For developers who simply wants to leverage the capabilities of PeerCom, they do not need any further knowledge to the internal design of PeerCom. To those who may considering alter the design, here's a brief to these modules,
 
 * WCC - WebSocket Communication Channel. WCC plays the role as the basic signaling channel object. WCC is designed to provide the very basic functionalities to get connected and exchange module-deifined or user-defined data with other PeerCom agents. A WebSocket server to incorporate with WCC named [Message Switch Router] (https://github.com/gatherhub/msgsrouter) written in Ruby is also provided in open source. There is only one WCC instance for each PeerCom agent.
-* WPC - WebRTC PeerConnection Channel. With the help from WCC, WPC sets up a meshed peer-to-peer data channels among connected PeerCom agents if possible and once the data channel is opened, WPC replace WCC as the major communication channel between peers. When WPC setup is not possible, peers can still send/receive messages through WCC. PeerCom will check the availability automatically and selet the right one. There is one WPC for each connected peers.
-* WMC - WebRTC Media Channel. WMC is dynamically created and destroyed when a media transmision is needed or closed. There could be N WMC objects depending on the use cases. WMC handles all media creation, negotiation, and manipulation internally. Developer only needs to provide the correct configuration without geting involved to the complex procedures.
+* WPC - WebRTC PeerConnection Channel. With the help from WCC, WPC sets up a meshed peer-to-peer data channels among connected PeerCom agents if possible and once the data channel is opened, WPC replace WCC as the major communication channel between peers. When WPC setup is not possible, peers can still send/receive messages through WCC. PeerCom will check the availability automatically and select the right one. There is one WPC for each connected peers.
+* WMC - WebRTC Media Channel. WMC is dynamically created and destroyed when a media transmision is needed or closed. There could be N x WMC objects depending on the use cases. WMC handles all media creation, negotiation, and manipulation internally. Developer only needs to provide the correct configuration without geting involved to the complex procedures.
 
 Usage Example:
 ```javascript
@@ -29,7 +29,7 @@ Usage Example:
   
   // setup handler for message
   pc.onmessage = function (msg) {
-    console.log(msg);
+    console.log(msg.from, msg.type, msg.data);
   };
   // set up handler for media reuqest
   pc.onmediarequest = function (req) {
@@ -53,17 +53,17 @@ Usage Example:
   
   // make a call
   var mdesc = {audio: true, video: true};
-  var req = {to: xpeer, mdesc};
+  var req = {to: peerx, mdesc};
   var id = pc.mediaRequest(req);
   if (id) {
     console.log('requesting')
     // set local stream handler
     pc.medchans[id].onlstreamready = function (stream) {
-      addLocalStream(stream);
+      addLocalMedia(stream);
     };
     // set remote stream handler
     pc.medchans[id].onrstreamready = function (stream) {
-      addRemoteStream(stream);
+      addRemoteMedia(stream);
     };
   }
 ```
@@ -160,11 +160,11 @@ String, read-write - 'hub' is the identiification of a "room" PeerCom intended t
 
 **servers**
 
-Array[String], read-write - Address of MSR in the formate of 'wss://<server>:<port>' in an Array. If more than one is provided, PeerCom will try to connect the next MSR in round-robin manner in connection failure. Insecure WebSocket (ws://) is also supported. However, there is strict requirement in browser that only allows web pages and scripts to open media devices from a secure channel. Hence, it is recommeded to use secure WebSocket to get full features of PeerCom available.
+Array(String), read-write - Address of MSR in the formate of 'wss://<server>:<port>' in an Array. If more than one is provided, PeerCom will try to connect the next MSR in round-robin manner in connection failure. Insecure WebSocket (ws://) is also supported. However, there is strict requirement in browser that only allows web pages and scripts to open media devices from a secure channel. Hence, it is recommeded to use secure WebSocket to get full features of PeerCom available.
 
 **iceservers**
 
-Array[Object/JSON], read-write - Address of Ice servers, same sa defined in WebRTC. It is for WebRTC PeerConnection object initiation. A null value can be provided when testing peers are in the same LAN, but active Ice servers are needed if PeeCom is running over Internet.
+Array(Object/JSON), read-write - Address of Ice servers, same sa defined in WebRTC. It is for WebRTC PeerConnection object initiation. A null value can be provided when testing peers are in the same LAN, but active Ice servers are needed if PeeCom is running over Internet.
 
 **peers**
 
@@ -225,6 +225,8 @@ NOTE: here is a list of properties, event callbacks, and methods of WMC,
   * onstatechange(state) - Fired when WMC state changed.
   * onlstreamready(stream) - Fired when local stream is ready.
   * onrstreamready(stream) - Fired when remote stream is ready.
+
+NOTE: onlstreamready and onrstreamready maybe fired before callback function is configured. It is suggested to check the WMC.lstream and WMC.rstream availability first instead of all relying on onlstreamready/onrstreamready events.
 
 - WMC Methods:
   * accept() - Accept offer, should call PeerCom.mediaResponse(req, 'accept') instead.
@@ -313,11 +315,150 @@ When a local stream is created by setLocalStream() instead of standard mediaRequ
 
 ConfAgent provides the functionalities of setting up a full-meshed peer-to-peer audio/video conference. A peer may initiate a conference request through ConfAgent. Peers can answer the conference request through ConfAgent. ConfAgent also maintains the connectivity state of conferencing peers and generates events at peer's join or left.
 
+Usage Example:
+```javascript
+  var pc = new Gatherhub.PeerCom(config);
+  var ca = new Gatherhub.ConfAgent(pc);
+  
+  pc.onmessage = function (msg) {
+    // when a message is received, pass it to ConfAgent first.
+    msg = ca.consumemsg(msg);
+    // if the message is for ConfAgent, it will be consumed by ConfAgent and return null, otherwise, return message as is.
+    if (msg) {
+      // do whatever it supposed to
+    }
+  };
+  
+  pc.onmediarequest = function (req) {
+    // when a request is received, pass it to ConfAgent first.
+    req = ca.consumereq(req);
+    // if the request is for ConfAgent, it will be consumed by ConfAgent and return null, otherwise, return request as is.
+    if (req) {
+      // do whatever it supposed to
+    }
+  };
+  
+  ca.onconfrequest = function (req) {
+    // notify user of conference request through user interface
+    
+    // user can get the list of peers who are invited to the conference from req.peers
+    // and each peers' response from ca.pstate[peer]
+    req.peers.forEach(function(p) {
+        // filter self from conference peer list
+        if (p != pc.id) {
+          console.log(pc.peers[p].peer + ' state: ' + ca.pstate[p]);
+        }
+    });
+  };
+  
+  ca.onconfresponse = function(res) {
+    // update peer respoonse in user interface
+  };
+  
+  ca.onmedchancreated = function(medchan) {
+    // attach media streams to html media object
+    medchans.onlstreamready = function (stream) {
+      addLocalMedia(stream);
+    }
+    
+    medchan.onrstreamready = function (stream) {
+      addRemoteMedia(stream);
+    }
+  };
+  
+  ca.onstatechange = function(state) {
+    // update user interface based on ConfAgent state update
+  };
+  
+  // add peer into conference
+  ca.addPeer(peer);
+  
+  // remove peer from conference
+  ca.removePeer(peer);
+  
+  // make conference request
+  ca.request(mdesc);
+  
+  // accept conference request
+  ca.response('accept');
+  
+  // reject conference request
+  ca.response('reject');
+  
+  // cancel conference request
+  ca.cancel();
+  
+  // mute/unmute microphone
+  ca.mute();
+  
+  // exit from a conference
+  ca.exit();
+  
+  // rest conference agent
+  ca.reset();
+```
+
+### Properties:
+
+**peers**
+
+Array(String), read-only - Conference peer list stores peer_id of invited peers.
+
+**pstate**
+
+Object/JSON, read-only - Conference peer state: 'host'/'wait'/'accepted'/'rejected'/'joined'/'left'
+
+**pmedchans**
+
+Object/JSON, read-only - Key = peer_id, WMC object for each conference peer.
+
+**state**
+
+String, read-only - ConfAgent State: 'idle'/'requeseting'/'waitanswer'/'answering'/'joining'/'canceling'/'leaving'
+
+**muted**
+
+Boolean, read-only - ConfAgent muted state: true/false, default: false
+
+### Event Callbacks:
+
+**onconfrequest(req)**
+
+**onconfresponse(msg)**
+
+**onmedchancreated(medchan)**
+
+**onstatechange(state)**
+
+### Methods:
+
+**start()**
+
+**consumemsg(msg)**
+
+**consumereq(req)**
+
+**addPeer(p, s)**
+
+**removePeer(p)**
+
+**request(mdesc)**
+
+**response(res)**
+
+**cancel()**
+
+**mute()**
+
+**exit()**
+
+**reset()**
+
 ## castagent.js
 
 CastAgent provides the funcationalities of setting up a one-to-many one-way audio/video broadcasting service. A peer may start a broadcast with CastAgent or receiving broadcast through CastAgent. CastAgent maintains the broadcasting state of peers and update the changes to the others. It also maintains the audience join/left state and update changes to the broadcast host.
 
-Usage example:
+Usage Example:
 ``` javascript
   var pc = new Gatherhub.PeerCom(config);
   var sa = new Gatherhub.CastAgent(pc);

@@ -1,10 +1,10 @@
 ## Overview
 
 There are four core files for PeerCom:
-* peercom.js - Core implementation of PeerCom to provide all-in-one (data/audio/video) WebRTC peer functions with wrapped up signaling and media channel setup procedures in simple APIs.
-* confagent.js - Implementation of full-meshed peer-to-peer audio/video conferencing features based on PeerCom.
-* castagent.js - Implementation of one-way audio/video broadcassting features based on PeerCom.
-* peercom-example.js - Demostration of the integration of UI and PeerCom libraries.
+* **peercom.js** - Core implementation of PeerCom to provide all-in-one (data/audio/video) WebRTC peer functions with wrapped up signaling and media channel setup procedures in simple APIs.
+* **confagent.js** - Implementation of full-meshed peer-to-peer audio/video conferencing features based on PeerCom.
+* **castagent.js** - Implementation of one-way audio/video broadcassting features based on PeerCom.
+* **peercom-example.js** - Demostration of the integration of UI and PeerCom libraries.
 
 **NOTE**: To avoid naming conflicts, all object modules are declared under Gatherhub naming space. For example. 
 

@@ -424,62 +424,163 @@ Boolean, read-only - ConfAgent muted state: true/false, default: false
 
 **onconfrequest(req)**
 
+Fired when a conference request is received. Application should notify user of the request.
+
 **onconfresponse(msg)**
+
+Fired when a conference response is received. All ConfAgent signaling mesaages are broadcast to conference peers such that every peer gets the same information.
 
 **onmedchancreated(medchan)**
 
+Fired when a media channel is cretaed. Application should bind streams to media element.
+
 **onstatechange(state)**
+
+Fired when ConfAgent state changed.
 
 ### Methods:
 
 **start()**
 
+Start ConfAgent service. start() should be called after PeerCom state turns to 'started' since ConfAgent relies on PeerCom for all communications.
+
 **consumemsg(msg)**
+
+Apllication should call comsusemsg() in PeerCom.onmessage event callback. ConfAgent will check if the message is a ConfAgent signaling message and make relative processes. If the message matched, consumemsg() returns null, otherwise, the message is returend as is.
 
 **consumereq(req)**
 
+Apllication should call comsusereq() in PeerCom.onmediarequest event callback. ConfAgent will check if the request matched to a ConfAgent active session and make relative processes. If the request matched, consumereq() returns null, otherwise, the request is returend as is.
+
 **addPeer(p, s)**
+
+Add a peer into ConfAgent.
 
 **removePeer(p)**
 
+Remove a peer from ConfAgent.
+
 **request(mdesc)**
+
+Starte a conference. Conference peers should be added first with addPeer().
 
 **response(res)**
 
+Reply to a conference request. res = 'accept' or 'reject'.
+
 **cancel()**
+
+Cancel a conference request.
 
 **mute()**
 
+Mute/unmute microphone in a conference. User may check 'muted' property of the current state.
+
 **exit()**
 
+Exit from a conference.
+
 **reset()**
+
+Reset ConfAgent to default.
 
 ## castagent.js
 
 CastAgent provides the funcationalities of setting up a one-to-many one-way audio/video broadcasting service. A peer may start a broadcast with CastAgent or receiving broadcast through CastAgent. CastAgent maintains the broadcasting state of peers and update the changes to the others. It also maintains the audience join/left state and update changes to the broadcast host.
 
-Usage Example:
+Usage Example (together with ConfAgent):
 ``` javascript
   var pc = new Gatherhub.PeerCom(config);
+  var ca = new Gatherhub.ConfAgent(pc);
   var sa = new Gatherhub.CastAgent(pc);
+  
+  pc.onmessage = function (msg) {
+    // when a message is received, pass it to ConfAgent first.
+    msg = ca.consumemsg(msg);
+    // then pass the msg to CastAgent if still valid. The order of consumption of ConfAgent and CastAgent does not matter.
+    if (msg) {
+      msg = sa.consumemsg(msg);
+    }
+    // if the message is for ConfAgent, it will be consumed by ConfAgent and return null, otherwise, return message as is.
+    if (msg) {
+      // do whatever it supposed to
+    }
+  };
+  
+  pc.onmediarequest = function (req) {
+    // when a request is received, pass it to ConfAgent first.
+    req = ca.consumereq(req);
+    // then pass the req to CastAgent if still valid. The order of consumption of ConfAgent and CastAgent does not matter.
+    if (req) {
+      req = sa.consumereq(req);
+    }
+    // if the request is for ConfAgent, it will be consumed by ConfAgent and return null, otherwise, return request as is.
+    if (req) {
+      // do whatever it supposed to
+    }
+  };
+  
+  // skip other ConfAgent event callbacks set upt
+
+  // set up CastAgent event callbacks
+  sa.oncaststart = function(peer) {
+    // update UI to nofity the 'peer' is broadcasting
+  };
+  
+  sa.oncaststop = function(peer) {
+    // update UI to notify the 'peer' is no longer broadcasting
+  };
+  
+  sa.onlocalstream = function(stream) {
+    // bind stream to a media element
+  }
+  
+  sa.onremotestream = function(medchan) {
+    // bind medchan.rstream to a media element
+    if (medchan.rstream) {
+      addRemoteMedia(medchan.rstream);
+    }
+    else {
+      medchan.onrstreamready = function (stream) {
+        addRemoteMedia(stream);
+      }
+    }
+  };
+  
+  sa.onpeerjoin = function(peer) {
+    // update UI so user know a peer has joined
+  };
+  
+  sa.onpeerleft = function(peer) {
+    // update UI so user knows a peer has left
+  };
 ```
 
 ### Properties:
 
 **mdesc**
 
-Media description, stores the media description
+Media description of CastAgent as a broadcasting peer.
 
 **castpeers**
 
+Array, read-only - A list of currently broadcasting peers.
 
 **pmdesc**
 
+Object/JSON, read-only - Media description of a broadcasting peer.
+
 **pmedchans**
+
+Object/JSON, read-only - Media channel object(s) to a broadcasting peer or audience peers.
 
 **lstream**
 
+Object/MediaStream, read-write - Local stream object of the broadcasting peer.
+
 **state**
+
+String, read-only - CastAgent state: 'idle'/'requesting'/'recvcast'/'casting'
 
 ### Event Callbacks:
 
@@ -487,47 +588,62 @@ Media description, stores the media description
 
 'oncaststart' is fired by ConfAgent when a remote peer started a casting. 'peer' is the remote peer who started a broadcast. Application should update UI to notify user about the change.
 
-
-```javascript
-sa.oncaststart = function(p) {
-  // add broadcasting to peer title
-}
-```
-
 **oncaststop(peer)**
 
 'oncaststop' is fired by ConfAgent when a remote peer stopped a casting. 'peer' is the remote peer who stopped a broadcast. Application should update UI to notify user about the change.
 
 **onpeerjoin(peer)**
 
-'onpeerjoin' is fired by broadcasting ConfAgent when a remote peer is starting to receive the broadcast. 'peer' is the remote peer who is joining the broadcast. Application may update UI to notify user about the change.
+'onpeerjoin' is fired when a remote peer is starting to receive the broadcast. 'peer' is the remote peer who is joining the broadcast. Application may update UI to notify user about the change.
 
 **onpeerleft(peer)**
 
-'onpeerleft' is fired by broadcasting ConfAgent when a remote peer is stopping to receive the broadcast. 'peer' is the remote peer who is leaving the broadcast. Application may update UI to notify user about the change.
+'onpeerleft' is fired by when a remote peer is stopping to receive the broadcast. 'peer' is the remote peer who is leaving the broadcast. Application may update UI to notify user about the change.
 
 **onlocalstream(stream)**
 
+Fired when CastAgent has a local stream ready. This event is only fired on the broadcasting side. Application should bind the local stream with media element for audio/video capturing.
+
 **onremotestream(stream)**
 
+Fired when CastAgent received a remote stream. This event is only fired on the audience side. Application should bind the remote stream with media element for audio/video playing.
+
 **onstatechange(state)**
+
+Fired when CastAgent state changed.
 
 ### Methods:
 
 **start()**
 
-**startcast(desc)**
+Start CastAgent service. start() should be called after PeerCom state turns to 'started' since CastAgent relies on PeerCom for all communications.
+
+**startcast(mdesc)**
+
+Start a audio/video broadcasting. The type of broadcasting is configured through mdesc and the direction is forced to be set as 'sendonly'.
 
 **stopcast()**
 
+Stop broadcasting.
+
 **recvcast(peer)**
+
+Receiving broadcast from 'peer'.
 
 **endrecv()**
 
+Stop receiving broadcast.
+
 **consumemsg(msg)**
 
+Apllication should call comsusemsg() in PeerCom.onmessage event callback. CastAgent will check if the message is a CastAgent signaling message and make relative processes. If the message matched, consumemsg() returns null, otherwise, the message is returend as is.
+
 **consumereq(req)**
+
+Apllication should call comsusereq() in PeerCom.onmediarequest event callback. CastAgent will check if the request matched to a CastAgent active session and make relative processes. If the request matched, consumereq() returns null, otherwise, the request is returend as is.
 
 ## peercom-example.js
 
 peercom-example.js is the application which glues everything together including user interface. It is provided as a complete demo or a ready to use implementation for developers. peercom-example demostrates the manipulation of PeerCom and how to dynamically notify and change user interface to provide a peer-to-peer media communication client.
+
+Check out the real deployment at https://www.gatherhub.com/

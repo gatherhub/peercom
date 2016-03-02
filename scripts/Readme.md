@@ -203,34 +203,34 @@ Object/JSON, read-only - Media Channels, dyanmically created and self-managed by
 NOTE: here is a list of properties, event callbacks, and methods of WMC,
 
 - WMC Properties:
-* id - Unique WMC id and key of PeerCom.medchans 
-* to - WMC target peer
-* from - WMC source peer
-* mdesc - Media description
-* lsdp - local SDP, maianly for debugging
-* rsdp - remote SDP, mainly for debugging
-* lconn - local ICE candidates, mainly for debugging
-* rconn - remote ICE candidates, mainly for debugging
-* lstream - local stream
-* rstream - remote stream
-* csrcstream - customized source stream, this is used to set customized source stream instead of default local stream. It is part of media relay/forward feature which is not completed yet.
-* muted: true/false
-* type: 'audio'/'video'
-* audiodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
-* videodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
-* state: 'initialized'/'preparing'/'open'/'canceled'/'rejected'/'ended'/'failed'/'requesting'/'accepting'/'timeout'/'closed'
+  * id - Unique WMC id and key of PeerCom.medchans 
+  * to - WMC target peer
+  * from - WMC source peer
+  * mdesc - Media description
+  * lsdp - local SDP, maianly for debugging
+  * rsdp - remote SDP, mainly for debugging
+  * lconn - local ICE candidates, mainly for debugging
+  * rconn - remote ICE candidates, mainly for debugging
+  * lstream - local stream
+  * rstream - remote stream
+  * csrcstream - customized source stream, this is used to set customized source stream instead of default local stream. It is part of media relay/forward feature which is not completed yet.
+  * muted: true/false
+  * type: 'audio'/'video'
+  * audiodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
+  * videodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
+  * state: 'initialized'/'preparing'/'open'/'canceled'/'rejected'/'ended'/'failed'/'requesting'/'accepting'/'timeout'/'closed'
 
 - WMC Event Callbacsk:
-* onstatechange(state) - Fired when WMC state changed.
-* onlstreamready(stream) - Fired when local stream is ready.
-* onrstreamready(stream) - Fired when remote stream is ready.
+  * onstatechange(state) - Fired when WMC state changed.
+  * onlstreamready(stream) - Fired when local stream is ready.
+  * onrstreamready(stream) - Fired when remote stream is ready.
 
 - WMC Methods:
-* accept() - Accept offer, should call PeerCom.mediaResponse(req, 'accept') instead.
-* reject() - Reject offer, should call PeerCom.mediaResponse(req. 'reject') instead.
-* cancel() - Cancel offer request.
-* end() - End session.
-* mute() - Mute local audio capturing.
+  * accept() - Accept offer, should call PeerCom.mediaResponse(req, 'accept') instead.
+  * reject() - Reject offer, should call PeerCom.mediaResponse(req. 'reject') instead.
+  * cancel() - Cancel offer request.
+  * end() - End session.
+  * mute() - Mute local audio capturing.
 
 **support**
 

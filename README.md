@@ -2,7 +2,9 @@
 
 ### _Peer-to-Peer Messaage, Data, Audio, Video, Conferencing, and Broadcasting_
 
-PeerCom is a WebRTC implementation to provide the above features. It also provides fully wrapped up APIs and nice example to help developers to deliver these features quickly without going through the complex processes. 
+PeerCom is a WebRTC implementation to provide the above features. It also provides fully wrapped up APIs and nice example to help developers to deliver these features quickly without going through the complex processes.
+
+You can try it here, https://www.gatherhub.com/
 
 **NOTE:** Currently PeerCom only supports Google Chrome browser for PC/Android. There will be additional work to support other browsers.
 

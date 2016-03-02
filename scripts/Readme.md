@@ -14,8 +14,6 @@ var ca = new Gatherhub.ConfAgent(pc);
 var sa = new Gatherhub.CastAgent(pc);
 ```
 
-
-
 ## peercom.js
 
 peercom.js is the very core module of PeerCom. It consists three internal object modules which does not interact with application directly but do the real jobs below the surface. For developers who simply wants to leverage the capabilities of PeerCom, they do not need any further knowledge to the internal design of PeerCom. To those who may considering alter the design, here's a brief to these modules,
@@ -24,6 +22,51 @@ peercom.js is the very core module of PeerCom. It consists three internal object
 * WPC - WebRTC PeerConnection Channel. With the help from WCC, WPC sets up a meshed peer-to-peer data channels among connected PeerCom agents if possible and once the data channel is opened, WPC replace WCC as the major communication channel between peers. When WPC setup is not possible, peers can still send/receive messages through WCC. PeerCom will check the availability automatically and selet the right one. There is one WPC for each connected peers.
 * WMC - WebRTC Media Channel. WMC is dynamically created and destroyed when a media transmision is needed or closed. There could be N WMC objects depending on the use cases. WMC handles all media creation, negotiation, and manipulation internally. Developer only needs to provide the correct configuration without geting involved to the complex procedures.
 
+Usage Example:
+```javascript
+  // create a PeerCom ojbect
+  var pc = new Gatherhub.PeerCom(config);
+  
+  // setup handler for message
+  pc.onmessage = function (msg) {
+    console.log(msg);
+  };
+  // set up handler for media reuqest
+  pc.onmediarequest = function (req) {
+    switch (req.type) {
+      case 'offer':
+        // accept the call
+        pc.mediaResponse(req, 'accept');
+        // reject the call
+        pc.mediaResponse(req, 'reject');
+        break;
+      case 'answer':
+        console.log('call connected');
+        break;
+      case 'reject':
+      case 'cancel':
+      case 'end':
+        console.log('call ends');
+        break;
+    }
+  };
+  
+  // make a call
+  var mdesc = {audio: true, video: true};
+  var req = {to: xpeer, mdesc};
+  var id = pc.mediaRequest(req);
+  if (id) {
+    console.log('requesting')
+    // set local stream handler
+    pc.medchans[id].onlstreamready = function (stream) {
+      addLocalStream(stream);
+    };
+    // set remote stream handler
+    pc.medchans[id].onrstreamready = function (stream) {
+      addRemoteStream(stream);
+    };
+  }
+```
 ### Data Structures:
 
 **config** - PeerCom Configurations
@@ -101,7 +144,6 @@ Media request provides the requirements of media channel. For a new request, use
   };
 ```
 
-
 ### Properties:
 
 **id**
@@ -156,50 +198,6 @@ Object/JSON, read-only - Media Channels, dyanmically created and self-managed by
 
     // close channel
     pc.medchans[id].end();
-    
-    pc.medchans[id].onlstreamready = function (stream) {
-      addLocalStream(stream);
-      // or
-      addLocalStream(pc.medchans[id].lstream);
-    }
-
-    pc.medchans[id].onrstreamready = function (stream) {
-      addRemoteStream(stream);
-      // or
-      addRemoteStream(pc.medchans[id].rstream);
-    }
-  }
-  
-  // code snippet on callee side
-  var pc = new Gatherhub.PeerCom(config);
-  
-  pc.onmediarequest(req) = function (req) {
-    switch (req) {
-      case 'offer':
-        // when 'offer' is received, a medchans[req.id] is created and waiting for user to response with PeerCom.mediaResponse()
-        if (pc.medchans[req.id]) {
-          pc.medchans[id].onlstreamready = function (stream) {
-            addLocalStream(stream);
-            // or
-            addLocalStream(pc.medchans[id].lstream);
-          }
-      
-          pc.medchans[id].onrstreamready = function (stream) {
-            addRemoteStream(stream);
-            // or
-            addRemoteStream(pc.medchans[id].rstream);
-          }
-        }
-        break;
-      case 'answer':
-        // when 'answwer' is received, the media channel is set up completly and ready to send/receive stream
-        break;
-      case 'cancel':
-      case 'reject':
-      case 'end':
-        // when a media channel is closed, it will be auto-destroyed by PeerCom
-        break;
-    }
   }
 ```
 
@@ -251,7 +249,6 @@ Boolean, read-write - true/false. Enable/disable Audo-ping function, default ena
 
 Numeric, read-write - The wating time for each auto-ping interval.
 
-
 ### Event Callbacks:
 
 **onerror(error)**
@@ -281,7 +278,6 @@ Fired when a peer's WPC (sigchan) state changed. This helps application to catch
 **onlocalstream(localstream)**
 
 Fired when 'localstream' is set. Refer to setLocatStream for more detail.
-
 
 ### Methods:
 
@@ -313,13 +309,13 @@ freeLocalStream()
 
 When a local stream is created by setLocalStream() instead of standard mediaRequest()/mediaResponse() functions, the local stream will be locked untill freeLocalStream() is called. User must call freeLocalStream after calling setLocalstream.
 
-
-
 ## confagent.js
+
+ConfAgent provides the functionalities of setting up a full-meshed peer-to-peer audio/video conference. A peer may initiate a conference request through ConfAgent. Peers can answer the conference request through ConfAgent. ConfAgent also maintains the connectivity state of conferencing peers and generates events at peer's join or left.
 
 ## castagent.js
 
-CastAgent provides the funcationality of playing the role as a broadcasting host or audience. CastAgent is implemented with its own state and signalling process and leverage PeerCom to exchange signalling information and media channel set up.
+CastAgent provides the funcationalities of setting up a one-to-many one-way audio/video broadcasting service. A peer may start a broadcast with CastAgent or receiving broadcast through CastAgent. CastAgent maintains the broadcasting state of peers and update the changes to the others. It also maintains the audience join/left state and update changes to the broadcast host.
 
 Usage example:
 ``` javascript

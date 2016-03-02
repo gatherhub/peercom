@@ -1,6 +1,6 @@
 # PeerCom
 
-### _Peer-to-Peer Messaage, Data, Audio, Video, Conferencing, and Broadcasting_
+### _Peer-to-Peer Messaage, Data, Audio, Video, Conferencing, and Broadcasting——
 
 **NOTE:** Currently PeerCom only supports Google Chrome browser for PC/Android. There will be additional work to support other browsers.
 
@@ -12,7 +12,7 @@ PeerCom can be used as a peer-to-peer communication library or as a complete pee
 
 # Module Description and API Manual
 
-Module description and API manual is put in /scripts folder.
+Module description and API manual is put in /scripts folder. [Click here] (https://github.com/gatherhub/peercom/tree/master/scripts)
 
 # License
 

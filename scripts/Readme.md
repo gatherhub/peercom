@@ -26,6 +26,8 @@ peercom.js is the very core module of PeerCom. It consists three internal object
 
 **config** - PeerCom Configurations
 
+PeerCom confiurations can be provided at instance creation or configured later through its properties.
+
 ```javascript
   var peer_name = 'My name';  // Display name of a peer, a unique Peer ID is dynamically given by Message Switch Router when connected
   var hubid = 'myhub';        // Any strings, only peers with the same hub ID can communicate to each others.
@@ -50,7 +52,7 @@ peercom.js is the very core module of PeerCom. It consists three internal object
   };
 ```
 
-mdesc/desc - Media Description
+**mdesc/desc** - Media Description
 
 Media description is very similar to WebRTC getUserMedia constraints but only with some little extensions,
 
@@ -64,7 +66,7 @@ Media description is very similar to WebRTC getUserMedia constraints but only wi
   // add extended audio/video direction constraints, when direction is not set, default is bi-directional 'sendrecv'
   var mdesc = {
     audio: {
-      dir: 'recvonly'
+      dir: 'recvonly'   // dir is the PeerCom extension to set the stream direction
     },
     video: {
       mandatory: {
@@ -74,11 +76,28 @@ Media description is very similar to WebRTC getUserMedia constraints but only wi
         maxHeight:240
       },
       dir: 'sendonly'
+      // audio/video may be set with different directions, 
+      // options are 'sendrecv', 'sendonly', 'recvonly', 'inactive'
     }
   };
 ```
 
-req/res - Media Request/Response
+**req/res** - Media Request/Response
+
+Media request provides the requirements of media channel. For a new request, user only needs to provide the target peer (to) and media description (mdesc) field to PeerCom. If media channel set up is possible a unique request ID will be added to (req) and be used within the whole session which is also the major identy of a media channel. As negotiation moves on, more information will be appended to (req) automatically. User may alter a (req) returned from PeerCom to make desired change, but it might not be necessary in most of times.
+
+```javascript
+  var req = {
+    // id: reqid            //
+    to: peer_id,
+    // from:                //
+    mdesc: mdesc,
+    // sdp: sdp             //
+    // conn: icecandidate,  //
+    // confid: confid,      //
+    // castid: castid       //
+  };
+```
 
 ### Properties:
 

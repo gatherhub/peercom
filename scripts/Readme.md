@@ -137,7 +137,96 @@ Object/JSON, read-only - 'peers' is self-managed by PeerCom and holds the 'peer'
 
 **medchans**
 
-Object/JSON, read-only -
+Object/JSON, read-only - Media Channels, dyanmically created and self-managed by PeerCom. Each media channel is a WMC object with a unique WMC id which is the same as the key of 'medchans'. Users may perform operations on a media channel through 'medchans'.
+
+```javascript
+  // code snippet on caller side
+  var pc = new Gatherhub.PeerCom(config);
+  var id = pc.mediaRequest(req);
+  
+  if (id && pc.medchans[id]) {
+    // mute/unmute channel
+    pc.medchans[id].mute();
+
+    // canceling request
+    pc.medchans[id].cancel();
+
+    // close channel
+    pc.medchans[id].end();
+    
+    pc.medchans[id].onlstreamready = function (stream) {
+      addLocalStream(stream);
+      // or
+      addLocalStream(pc.medchans[id].lstream);
+    }
+
+    pc.medchans[id].onrstreamready = function (stream) {
+      addRemoteStream(stream);
+      // or
+      addRemoteStream(pc.medchans[id].rstream);
+    }
+  }
+  
+  // code snippet on callee side
+  var pc = new Gatherhub.PeerCom(config);
+  
+  pc.onmediarequest(req) = function (req) {
+    switch (req) {
+      case 'offer':
+        // when 'offer' is received, a medchans[req.id] is created and waiting for user to response with PeerCom.mediaResponse()
+        if (pc.medchans[req.id]) {
+          pc.medchans[id].onlstreamready = function (stream) {
+            addLocalStream(stream);
+            // or
+            addLocalStream(pc.medchans[id].lstream);
+          }
+      
+          pc.medchans[id].onrstreamready = function (stream) {
+            addRemoteStream(stream);
+            // or
+            addRemoteStream(pc.medchans[id].rstream);
+          }
+        }
+        break;
+      case 'answer':
+        // when 'answwer' is received, the media channel is set up completly and ready to send/receive stream
+        break;
+      case 'cancel':
+      case 'reject':
+      case 'end':
+        // when a media channel is closed, it will be auto-destroyed by PeerCom
+        break;
+    }
+  }
+```
+
+NOTE: here is a list of properties, event callbacks, and methods of WMC,
+
+#### WMC Properties:
+* id - Unique WMC id and key of PeerCom.medchans 
+* to - WMC target peer
+* from - WMC source peer
+* mdesc - Media description
+* lsdp - local SDP, maianly for debugging
+* rsdp - remote SDP, mainly for debugging
+* lconn - local ICE candidates, mainly for debugging
+* rconn - remote ICE candidates, mainly for debugging
+* lstream - local stream
+* rstream - remote stream
+* csrcstream - customized source stream, this is used to set customized source stream instead of default local stream. It is part of media relay/forward feature which is not completed yet.
+* muted: true/false
+* type: 'audio'/'video'
+* audiodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
+* videodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
+* state: 'initialized'/'preparing'/'open'/'canceled'/'rejected'/'ended'/'failed'/'requesting'/'accepting'/'timeout'/'closed'
+
+#### WMC Event Callbacsk:
+* onstatechange(state) - Fired when WMC state changed.
+* onlstreamready(stream) - Fired when local stream is ready.
+* onrstreamready(stream) - Fired when remote stream is ready.
+
+#### WMC Methods:
+
 
 **support**
 

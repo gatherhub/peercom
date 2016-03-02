@@ -14,6 +14,8 @@ var ca = new Gatherhub.ConfAgent(pc);
 var sa = new Gatherhub.CastAgent(pc);
 ```
 
+
+
 ## peercom.js
 
 peercom.js is the very core module of PeerCom. It consists three internal object modules which does not interact with application directly but do the real jobs below the surface. For developers who simply wants to leverage the capabilities of PeerCom, they do not need any further knowledge to the internal design of PeerCom. To those who may considering alter the design, here's a brief to these modules,
@@ -98,6 +100,7 @@ Media request provides the requirements of media channel. For a new request, use
     // castid: castid       // castid is added by broadcast agent to identify a broadcast session
   };
 ```
+
 
 ### Properties:
 
@@ -234,51 +237,83 @@ NOTE: here is a list of properties, event callbacks, and methods of WMC,
 
 **support**
 
-Object/JSON, read-only -
+Object/JSON, read-only - PeerCom checks local media support capability and logged in 'support'.
 
 **state**
 
-String, read-pnly -
+String, read-pnly - PeerCom state: 'starting'/'started'/'stopping'/'stopped'
 
 **autoping**
 
-Boolean, read-write -
+Boolean, read-write - true/false. Enable/disable Audo-ping function, default enabled. When auto-ping is enabled, PeerCom will send a 'ping' message to all connected peers at the interval of 'pingwait'. Each ping response will come with the round-trip delay and overdue measurement to track the connectivity of each peers. When auto-ping is enabled, if a remote peer's WPC channel is closed or failed to response ping for three times, it will be removed from PeerCom.peers.
 
 **pingwait**
 
-Numeric, read-write -
+Numeric, read-write - The wating time for each auto-ping interval.
+
 
 ### Event Callbacks:
 
 **onerror(error)**
 
+Fired, when error occures in PeerCom.
+
 **onpeerchange(peers)**
+
+Fired when there is a peer joined or left. Application should update UI accordingly.
 
 **onmessage(message)**
 
+Fired when received a message. Some control messages is consumed by PeerCom itself and will not be passed down to application.
+
 **onmediarequest(req)**
+
+Fired when received a media request (offer). Application should handle the request properly and answer to the request.
 
 **onstatechange(state)**
 
-**onpeerstatechange(state)**
+Fired when PeerCom.state changed. Application should make corresponding UI changes based on the state.
+
+**onpeerstatechange(peerstate)**
+
+Fired when a peer's WPC (sigchan) state changed. This helps application to catch the changes of connected peer's data channel availabilty.
 
 **onlocalstream(localstream)**
 
+Fired when 'localstream' is set. Refer to setLocatStream for more detail.
+
+
 ### Methods:
 
-start()
+**start()**
 
-stop()
+Start PeerCom service.
 
-send(data, type, to) 
+**stop()**
 
-mediaRequest(req)
+Stop PeerCom service.
 
-mediaResponse(req, answer)
+**send(data, type, to)**
 
-setLocalStream(mdesc)
+Send message to target peer (to). If 'to' is not provided, message will be sent to all connected peers (in the same hub). 'type' can be any String, but there are already some types defined by PeerCom for flow-controls and some other types defined by other applications like ConfAgent and CastAgent. User must be careful about the type conflicts. 'data' can be any type of data, String, Numeric, Object/JSON. 
+
+**mediaRequest(req)**
+
+Make a media channel requeset (offer). The media channel configuration is configured in 'req' data structure (refer to 'req' in Data Structures). 
+
+**mediaResponse(req, answer)**
+
+Make an answer to a request, when an offer request is received from onmediarequest event callback, user simply put the 'req' into mediaResponse() and give an answer of 'accept' or 'reject' to accept or reject the offer.
+
+**setLocalStream(mdesc)**
+
+This is a special feature which is to get local stream object before opening any media channel (WMC). It is useful for broadcast scenario that a broadcasting host may open a local stream and waiting for connection before construct any. When setLocalStream is called and a local stream is created successfully, onlocalstream(stream）event callback will be fired. Please also refer to freeLocalStream.
 
 freeLocalStream()
+
+When a local stream is created by setLocalStream() instead of standard mediaRequest()/mediaResponse() functions, the local stream will be locked untill freeLocalStream() is called. User must call freeLocalStream after calling setLocalstream.
+
+
 
 ## confagent.js
 

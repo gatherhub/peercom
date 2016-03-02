@@ -203,7 +203,7 @@ Object/JSON, read-only - Media Channels, dyanmically created and self-managed by
 
 **NOTE**: here is a list of properties, event callbacks, and methods of WMC,
 
-- WMC Properties:
+- **WMC Properties:**
   * id - Unique WMC id and key of PeerCom.medchans 
   * to - WMC target peer
   * from - WMC source peer
@@ -221,14 +221,14 @@ Object/JSON, read-only - Media Channels, dyanmically created and self-managed by
   * videodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
   * state: 'initialized'/'preparing'/'open'/'canceled'/'rejected'/'ended'/'failed'/'requesting'/'accepting'/'timeout'/'closed'
 
-- WMC Event Callbacsk:
+- **WMC Event Callbacsk:**
   * onstatechange(state) - Fired when WMC state changed.
   * onlstreamready(stream) - Fired when local stream is ready.
   * onrstreamready(stream) - Fired when remote stream is ready.
 
-**NOTE**: onlstreamready and onrstreamready maybe fired before callback function is configured. It is suggested to check the WMC.lstream and WMC.rstream availability first instead of all relying on onlstreamready/onrstreamready events.
+**NOTE**: _**onlstreamready and onrstreamready maybe fired before callback function is configured. It is suggested to check the WMC.lstream and WMC.rstream availability first instead of all relying on onlstreamready/onrstreamready events.**_
 
-- WMC Methods:
+- **WMC Methods:**
   * accept() - Accept offer, should call PeerCom.mediaResponse(req, 'accept') instead.
   * reject() - Reject offer, should call PeerCom.mediaResponse(req. 'reject') instead.
   * cancel() - Cancel offer request.

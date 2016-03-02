@@ -1,3 +1,20 @@
-# peercom
+# PeerCom
 
-Introduction
+### _Peer-to-Peer Messaage, Data, Audio, Video, Conferencing, and Broadcasting——
+
+**NOTE:** Currently PeerCom only supports Google Chrome browser for PC/Android. There will be additional work to support other browsers.
+
+# Installation / Deployment
+
+PeerCom is implemented fully in Javascript as the front-end application. However, it does need a little help from a server. This particular server is called [Message Switch Router] (https://github.com/gatherhub/msgsrouter). Messaage Switch Router (or MSR) helps PeerCom to setup the peer-to-peer communication network. After that, MSR is not very needed and most communications go through the peer-to-peer channel created by PeerCom. You can run PeerCom with its original MSR configuration, or if you would like to setup your own, you may refer to https://github.com/gatherhub/msgsrouter. 
+
+PeerCom can be used as a peer-to-peer communication library or as a complete peer-to-peer client. PeerCom contains no server-side implementation and everything can be executed in a browser. Just download the PeerCom repository and put it on your https server. The next thing is to make sure you configured your https server correctly with proper certificate and private key. 
+
+# Module Description and API Manual
+
+Module description and API manual is put in /scripts folder.
+
+# License
+
+PeerCom is released and distributed under the permissive MIT License:
+Copyright (c) Quark Li, quarkli@gmail.com

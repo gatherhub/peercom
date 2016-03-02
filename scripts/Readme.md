@@ -101,11 +101,65 @@ Media request provides the requirements of media channel. For a new request, use
 
 ### Properties:
 
-id, peer, hub, servers, iceservers, peers, medchans, support, state, autoping, pingwait
+**id**
+
+String, read-only -
+
+**peer**
+
+String, read-write -
+
+**hub**
+
+String, read-write -
+
+**servers**
+
+Array[String], read-write -
+
+**iceservers**
+
+Array[Object/JSON], read-write -
+
+**peers**
+
+Object/JSON, read-only -
+
+**medchans**
+
+Object/JSON, read-only -
+
+**support**
+
+Object/JSON, read-only -
+
+**state**
+
+String, read-pnly -
+
+**autoping**
+
+Boolean, read-write -
+
+**pingwait**
+
+Numeric, read-write -
 
 ### Event Callbacks:
 
-onerror, onpeerchange, onmessage, onmediarequest, onstatechange, onpeerstatechange, onlocalstream
+**onerror(error)**
+
+**onpeerchange(peers)**
+
+**onmessage(message)**
+
+**onmediarequest(req)**
+
+**onstatechange(state)**
+
+**onpeerstatechange(state)**
+
+**onlocalstream(localstream)**
 
 ### Methods:
 
@@ -177,11 +231,11 @@ sa.oncaststart = function(p) {
 
 'onpeerleft' is fired by broadcasting ConfAgent when a remote peer is stopping to receive the broadcast. 'peer' is the remote peer who is leaving the broadcast. Application may update UI to notify user about the change.
 
-**onlocalstream**
+**onlocalstream(stream)**
 
-**onremotestream**
+**onremotestream(stream)**
 
-**onstatechange**
+**onstatechange(state)**
 
 ### Methods:
 
@@ -200,3 +254,5 @@ sa.oncaststart = function(p) {
 **consumereq(req)**
 
 ## peercom-example.js
+
+peercom-example.js is the application which glues everything together including user interface. It is provided as a complete demo or a ready to use implementation for developers. peercom-example demostrates the manipulation of PeerCom and how to dynamically notify and change user interface to provide a peer-to-peer media communication client.

@@ -52,6 +52,32 @@ peercom.js is the very core module of PeerCom. It consists three internal object
 
 mdesc/desc - Media Description
 
+Media description is very similar to WebRTC getUserMedia constraints but only with some little extensions,
+
+```javascript
+  // standard getUserMedia constraints is compatible
+  var mdesc = {
+    audio: true,
+    video: true
+  };
+  
+  // add extended audio/video direction constraints, when direction is not set, default is bi-directional 'sendrecv'
+  var mdesc = {
+    audio: {
+      dir: 'recvonly'
+    },
+    video: {
+      mandatory: {
+        minWidth: 320,
+        minWidth: 240,
+        maxWidth: 320,
+        maxHeight:240
+      },
+      dir: 'sendonly'
+    }
+  };
+```
+
 req/res - Media Request/Response
 
 ### Properties:

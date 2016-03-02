@@ -6,7 +6,7 @@ There are four core files for PeerCom:
 * castagent.js - Implementation of one-way audio/video broadcassting features based on PeerCom.
 * peercom-example.js - Demostration of the integration of UI and PeerCom libraries.
 
-NOTE: To avoid naming conflicts, all object modules are declared under Gatherhub naming space. For example. 
+**NOTE**: To avoid naming conflicts, all object modules are declared under Gatherhub naming space. For example. 
 
 ```javascript
 var pc = new Gatherhub.PeerCom(config);
@@ -201,7 +201,7 @@ Object/JSON, read-only - Media Channels, dyanmically created and self-managed by
   }
 ```
 
-NOTE: here is a list of properties, event callbacks, and methods of WMC,
+**NOTE**: here is a list of properties, event callbacks, and methods of WMC,
 
 - WMC Properties:
   * id - Unique WMC id and key of PeerCom.medchans 
@@ -226,7 +226,7 @@ NOTE: here is a list of properties, event callbacks, and methods of WMC,
   * onlstreamready(stream) - Fired when local stream is ready.
   * onrstreamready(stream) - Fired when remote stream is ready.
 
-NOTE: onlstreamready and onrstreamready maybe fired before callback function is configured. It is suggested to check the WMC.lstream and WMC.rstream availability first instead of all relying on onlstreamready/onrstreamready events.
+**NOTE**: onlstreamready and onrstreamready maybe fired before callback function is configured. It is suggested to check the WMC.lstream and WMC.rstream availability first instead of all relying on onlstreamready/onrstreamready events.
 
 - WMC Methods:
   * accept() - Accept offer, should call PeerCom.mediaResponse(req, 'accept') instead.

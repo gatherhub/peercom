@@ -1,6 +1,6 @@
 # PeerCom
 
-### _Peer-to-Peer Messaage, Data, Audio, Video, Conferencing, and Broadcasting——
+### _Peer-to-Peer Messaage, Data, Audio, Video, Conferencing, and Broadcasting_
 
 **NOTE:** Currently PeerCom only supports Google Chrome browser for PC/Android. There will be additional work to support other browsers.
 

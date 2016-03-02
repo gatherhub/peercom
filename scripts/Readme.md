@@ -202,7 +202,7 @@ Object/JSON, read-only - Media Channels, dyanmically created and self-managed by
 
 NOTE: here is a list of properties, event callbacks, and methods of WMC,
 
-#### WMC Properties:
+- WMC Properties:
 * id - Unique WMC id and key of PeerCom.medchans 
 * to - WMC target peer
 * from - WMC source peer
@@ -220,13 +220,17 @@ NOTE: here is a list of properties, event callbacks, and methods of WMC,
 * videodir: 'sendrecv'/'sendonly'/'recvonly'/'inactive'
 * state: 'initialized'/'preparing'/'open'/'canceled'/'rejected'/'ended'/'failed'/'requesting'/'accepting'/'timeout'/'closed'
 
-#### WMC Event Callbacsk:
+- WMC Event Callbacsk:
 * onstatechange(state) - Fired when WMC state changed.
 * onlstreamready(stream) - Fired when local stream is ready.
 * onrstreamready(stream) - Fired when remote stream is ready.
 
-#### WMC Methods:
-
+- WMC Methods:
+* accept() - Accept offer, should call PeerCom.mediaResponse(req, 'accept') instead.
+* reject() - Reject offer, should call PeerCom.mediaResponse(req. 'reject') instead.
+* cancel() - Cancel offer request.
+* end() - End session.
+* mute() - Mute local audio capturing.
 
 **support**
 

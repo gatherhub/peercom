@@ -29,7 +29,10 @@ peercom.js is the very core module of PeerCom. It consists three internal object
 ```javascript
   var peer_name = 'My name';  // Display name of a peer, a unique Peer ID is dynamically given by Message Switch Router when connected
   var hubid = 'myhub';        // Any strings, only peers with the same hub ID can communicate to each others.
-  var msrsvrs = ['wss://<server1>:<port>', 'wss://<server2>:<port2>']   // Message Switch Router server address, if more than one server is provided, WCC will auto rotate server connection at connection failure. To support media communication, SSL is required for security concern. therefore, we must use secure WebSocket (wss).
+  // Message Switch Router server address, if more than one server is provided, 
+  // WCC will auto rotate server connection at connection failure. To support media 
+  // communication, SSL is required for security concern. therefore, we must use secure WebSocket (wss).
+  var msrsvrs = ['wss://<server1>:<port>', 'wss://<server2>:<port2>'];   
   var icesvrs = [
         {'urls': 'stun:stun01.sipphone.com'},
         {'urls': 'stun:stun.fwdnet.net'},
@@ -38,9 +41,10 @@ peercom.js is the very core module of PeerCom. It consists three internal object
         {'urls': 'stun:chi2-tftp2.starnetusa.net'},
         {'urls': 'stun:stun.l.google.com:19302'}
     ];
+    
   var config = {
-    peer: 'peer_name',
-    hub:  'hub_id',
+    peer: peer_name,
+    hub:  hubid,
     servers: msrsvrs,
     iceservers: icesvrs,
   };

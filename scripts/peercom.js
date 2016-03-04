@@ -141,17 +141,12 @@ var Gatherhub = Gatherhub || {};
                     get: function() { return autoping; },
                     set: function(x) {
                         if (x) {
-                            pc.send('','ping');
+                            if (state == 'started') { pc.send('','ping'); }
 
                             setInterval(function() {
-                                pc.send('','ping');
-                                Object.keys(peers).forEach(function(k) {
-                                    if (isNaN(peers[k].overdue)) { peers[k].overdue = 0; }
-                                    peers[k].overdue++;
-                                    if (peers[k].overdue > 3 || peers[k].sigchan.state == 'closed') { _removePeer(k); }
-                                });
-                            }
-                        , pingwait);}
+                                if (state == 'started') { pc.send('','ping'); }
+                            }, pingwait);
+                        }
                         else { clearInterval(_ap); }
                         autoping = x;
                         return autoping;
@@ -252,7 +247,6 @@ var Gatherhub = Gatherhub || {};
                     }, logErr);
 
                 pc.pingwait = 30000;
-                pc.autoping = true;
                 _changeState('starting');
 
                 // Create WCC Object and Initiate Registration Event
@@ -279,9 +273,11 @@ var Gatherhub = Gatherhub || {};
                             if (peers[msg.from]) { _removePeer(msg.from); }
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
                             break;
-                        case 'sdp':
+                        case 'dcsetup':
+                            // remove zombie peer if a peer's WPC is closed and reopen it
+                            if (peers[msg.from] && peers[msg.from].sigchan.state == 'closed') { _removePeer(msg.from); }
                             if (peers[msg.from] === undefined) { _addPeer(msg.from, msg.data.peer, msg.data.support); }
-                            peers[msg.from].sigchan.open(msg.data);
+                            if (peers[msg.from].sigchan.state != 'open') { peers[msg.from].sigchan.open(msg.data); }
                             break;
                         case 'call':
                             if (pc.onmediarequest) { setTimeout(function() { pc.onmediarequest(msg.data); }, 0); }
@@ -299,15 +295,22 @@ var Gatherhub = Gatherhub || {};
                             break;
                         case 'pong':
                             if (peers[msg.from]) {
-                                peers[msg.from].overdue = 0;
                                 peers[msg.from].rtdelay = msg.data.delay;
                             }
-                            else {
+                            
+                            // checking for zombie peer
+                            // if ping replied from a peer whose WPC is closed, try to reopen WPC
+                            if (!peers[msg.from] || peers[msg.from].sigchan.state == 'closed') {
+                                _removePeer(msg.from);
                                 _addPeer(msg.from, msg.data.peer, msg.data.support);
                                 peers[msg.from].sigchan.open();
                             }
                         default:
-                            if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
+                            // to avoid duplicated messages sent in broadcast mode, 
+                            // only passes messages from those peers who could not open WPC
+                            if ((peers[msg.from] && peers[msg.from].sigchan.state != 'open') || !peers[msg.from]) {
+                                if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
+                            }
                             break;
                     }
                 };
@@ -322,6 +325,8 @@ var Gatherhub = Gatherhub || {};
                     }
                     else { _changeState(state); }
                 };
+
+                pc.autoping = autoping || true;
             }
 
             function stop() {
@@ -350,8 +355,11 @@ var Gatherhub = Gatherhub || {};
                         else {
                             for (var to in peers) {
                                 if (peers[to].sigchan.state == 'open') { ret = ret && peers[to].sigchan.send(data, type); }
-                                else { ret = _wcc.send(data, type, to); }
                             }
+                            // there may some peers who could not open WPC
+                            // to make sure everyone gets broadcast message, broadcast in WCC too
+                            // message maybe duplicated sent through WPC and WCC, so filter it in WCC.onmessage
+                            ret = ret && _wcc.send(data, type);
                         }
                     }
                     else if (_wcc) {
@@ -439,12 +447,7 @@ var Gatherhub = Gatherhub || {};
                         else {
                             if (msg.type == 'pong') {
                                 if (peers[msg.from]) {
-                                    peers[msg.from].overdue = 0;
                                     peers[msg.from].rtdelay = msg.data.delay;
-                                }
-                                else {
-                                    _addPeer(msg.from, msg.data.peer, msg.data.support);
-                                    peers[msg.from].sigchan.open();
                                 }
                             }
                             if (pc.onmessage) { setTimeout(function() { pc.onmessage(msg); }, 0); }
@@ -453,11 +456,10 @@ var Gatherhub = Gatherhub || {};
                     p.sigchan.onstatechange = function(s) {
                         if (pc.onpeerstatechange) { setTimeout(function() {
                             pc.onpeerstatechange({peer: pid, state: s}); }, 0);
-                    }
-                        if (s == 'close') { _removePeer(pid); }
+                        }
+                        if (s == 'closed') { _removePeer(pid); }
                     };
                     peers[pid] = p;
-                    if (pc.autoping) { pc.send('', 'ping', p); }
                     if (pc.onpeerchange) {
                         setTimeout(function() { pc.onpeerchange(peers); }, 0);
                     }
@@ -467,6 +469,7 @@ var Gatherhub = Gatherhub || {};
             function _removePeer(pid) {
                 if (peers[pid]) {
                     peers[pid].sigchan.close();
+                    peers[pid] = null;
                     delete peers[pid];
                     if (pc.onpeerchange) {
                         setTimeout(function() { pc.onpeerchange(peers); }, 0);
@@ -484,6 +487,7 @@ var Gatherhub = Gatherhub || {};
             function _wmcStateHandler(wmc) {
                 console.log('medchans[' + wmc.id + '].state:', wmc.state);
                 if (wmc.state == 'closed') {
+                    medchans[wmc.id] = null;
                     delete medchans[wmc.id];
                     wmc = null;
                     if (!_locklocalstream && localstream && Object.keys(medchans).length == 0) {
@@ -547,10 +551,17 @@ var Gatherhub = Gatherhub || {};
                     _res.conn = e.candidate;
                     _dispatch();
                 }
-                if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) { _changeState('open'); }
+                if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) {
+                    _changeState('open');
+                }
             };
             _pc.oniceconnectionstatechange =_pc.onsignalingstatechange = function(e) {
-                if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) { _changeState('open'); }
+                if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) {
+                    _changeState('open');
+                }
+                else if (_pc && (_pc.iceConnectionState == 'disconnected' || _pc.iceConnectionState == 'closed')) {
+                    _changeState('closed');
+                }
             };
             _pc.onaddstream = function(e) {
                 rstream = e.stream;
@@ -742,36 +753,18 @@ var Gatherhub = Gatherhub || {};
 
                 // only set sdp direction on offer request, answer side will generate corresponding sdp
                 if (!rsdp) {
-                    var ssdp = sdp.sdp;
-                    var astart = ssdp.search('m=audio');
-                    var vstart = ssdp.search('m=video');
-                    // check if audio stream direction needs to be modified
-                    if (audiodir != 'sendrecv' && astart > -1) {
-                        if (vstart > astart) {
-                            ssdp = ssdp.split('m=video');
-                            ssdp[0] = ssdp[0].split('sendrecv').join(audiodir);
-                            ssdp = ssdp.join('m=video');
+                    var ssdp = sdp.sdp.split('m=');
+
+                    ssdp.forEach(function(e) {
+                        if (e.indexOf('audio') == 0) {
+                            e.replace('sendrecv', audiodir);
                         }
-                        else {
-                            ssdp = ssdp.split('m=audio');
-                            ssdp[1] = ssdp[1].split('sendrecv').join(audiodir);
-                            ssdp = ssdp.join('m=audio');
+                        else if (e.indexOf('video' == 0)) {
+                            e.replace('sendrecv', videodir);
                         }
-                    }
-                    // check if video stream direction needs to be modified
-                    if (videodir != ' sendrecv' && vstart > -1) {
-                        if (vstart > astart) {
-                            ssdp = ssdp.split('m=video');
-                            ssdp[1] = ssdp[1].split('sendrecv').join(videodir);
-                            ssdp = ssdp.join('m=video');
-                        }
-                        else {
-                            ssdp = ssdp.split('m=audio');
-                            ssdp[0] = ssdp[0].split('sendrecv').join(videodir);
-                            ssdp = ssdp.join('m=audio');
-                        }
-                    }
-                    sdp.sdp = ssdp;
+                    });
+
+                    sdp.sdp = ssdp.join('m=');
                 }
                 _pc.setLocalDescription(sdp);
 
@@ -895,7 +888,9 @@ var Gatherhub = Gatherhub || {};
 
             // collect ICE candidates information
             _pc.onicecandidate = function(e) {
-                if (e.candidate) { _conn.push(e.candidate); }
+                if (e.candidate) {
+                    _sc.send({conn: e.candidate}, 'dcsetup', id);
+                }
             };
             // Assign datachannel object to _dc after received remote offer
             _pc.ondatachannel = function(e){
@@ -911,7 +906,13 @@ var Gatherhub = Gatherhub || {};
                 }
             };
 
-            var state = 'close';
+             _pc.oniceconnectionstatechange = function(e) {
+                if (_pc && (_pc.iceConnectionState == 'disconnected' || _pc.iceConnectionState == 'closed')) {
+                    _changeState('closed');
+                }
+            };
+
+            var state = 'idle';
             var onerror, onmessage, onstatechange;
             // Properties / Event Callbacks/ Methods declaration
             (function() {
@@ -955,9 +956,11 @@ var Gatherhub = Gatherhub || {};
                     }
 
                     if (offer.conn) {
-                        offer.conn.forEach(
-                            function(e) { _pc.addIceCandidate(new RTCIceCandidate(e)); }
-                        );
+                        _pc.addIceCandidate(new RTCIceCandidate(offer.conn));
+                    }
+
+                    if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) {
+                        _changeState('open');
                     }
                 }
                 else {
@@ -968,11 +971,12 @@ var Gatherhub = Gatherhub || {};
 
                     _pc.createOffer(_negotiation, logErr);
                 }
+                _changeState('opening');
             }
 
             function close() {
                 if (_dc) _dc.close();
-                if (_pc) _pc.close();
+                if (_pc && _pc.signalingState != 'closed') _pc.close();
             }
 
             function send(data, type) {
@@ -991,20 +995,7 @@ var Gatherhub = Gatherhub || {};
 
             function _negotiation(sdp) {
                 _pc.setLocalDescription(sdp);
-
-                var c = 0;
-                var wait = 3;
-                var disp = setInterval(function() {
-                    if (c == _conn.length) { wait--; }
-                    else {
-                        c = _conn.length;
-                        wait = 3;
-                    }
-                    if (!wait) {
-                        _sc.send({'sdp': _pc.localDescription, conn: _conn, support: spt}, 'sdp', id);
-                        clearInterval(disp);
-                    }
-                }, 50);
+                _sc.send({'sdp': _pc.localDescription, support: spt}, 'dcsetup', id);
             }
 
             function _dcsetup() {
@@ -1144,7 +1135,7 @@ var Gatherhub = Gatherhub || {};
                             ctx.to = ctx.from;
                             ctx.from = id;
                             ctx.type = 'pong';
-                            ctx.data = {tsArv: getTs()};
+                            ctx.data = {peer: _peer, support: _spt, tsArv: getTs()};
                             _ws.send(JSON.stringify(ctx));
                             break;
                         case 'pong':
@@ -1158,7 +1149,6 @@ var Gatherhub = Gatherhub || {};
                     }
                 };
                 _ws.onclose = function(e) {
-                    console.log('WCC Closed: (', e.code, ')');
                     _changeState('disconnected');
                     clearInterval(_beaconTask);
                     _ws = null;

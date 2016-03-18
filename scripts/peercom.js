@@ -485,7 +485,6 @@ var Gatherhub = Gatherhub || {};
             }
 
             function _wmcStateHandler(wmc) {
-                console.log('medchans[' + wmc.id + '].state:', wmc.state);
                 if (wmc.state == 'closed') {
                     medchans[wmc.id] = null;
                     delete medchans[wmc.id];
@@ -903,6 +902,7 @@ var Gatherhub = Gatherhub || {};
             _pc.onsignalingstatechange = function(e) {
                 if (_pc.signalingState == 'have-remote-offer') {
                     _pc.createAnswer(_negotiation, logErr);
+                    _changeState('answering');
                 }
             };
 
@@ -912,7 +912,7 @@ var Gatherhub = Gatherhub || {};
                 }
             };
 
-            var state = 'idle';
+            var state = 'initial';
             var onerror, onmessage, onstatechange;
             // Properties / Event Callbacks/ Methods declaration
             (function() {
@@ -951,16 +951,25 @@ var Gatherhub = Gatherhub || {};
             // Methods implementation
             function open(offer) {
                 if (offer) {
-                    if (offer.sdp) {
-                        _pc.setRemoteDescription(new RTCSessionDescription(offer.sdp));
+                    if (offer.sdp && Object.keys(offer.sdp).length && typeof offer.sdp == 'object') {
+                        var sdp = new RTCSessionDescription(offer.sdp);
+                        if (sdp) {
+                            _pc.setRemoteDescription(sdp);
+                            _changeState('processing');
+                        }
+                        else {
+                            console.error('SDP Error: sdp=', offer.sdp);
+                        }
                     }
 
-                    if (offer.conn) {
-                        _pc.addIceCandidate(new RTCIceCandidate(offer.conn));
-                    }
-
-                    if (_pc && (_pc.iceConnectionState == 'connected' || _pc.iceConnectionState == 'completed')) {
-                        _changeState('open');
+                    if (offer.conn && Object.keys(offer.conn).length && typeof offer.conn == 'object') {
+                        var conn = new RTCIceCandidate(offer.conn);
+                        if (conn) {
+                            _pc.addIceCandidate(conn);
+                        }
+                        else {
+                            console.error('IceCandidate Error: IceCandidate=', offer.conn);
+                        }
                     }
                 }
                 else {
@@ -970,8 +979,8 @@ var Gatherhub = Gatherhub || {};
                     }
 
                     _pc.createOffer(_negotiation, logErr);
+                    _changeState('offering');
                 }
-                _changeState('opening');
             }
 
             function close() {
